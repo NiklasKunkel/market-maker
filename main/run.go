@@ -7,7 +7,7 @@ import(
 
 func main() {
 	client := api.NewGatecoinClient("key", "secret")
-	ticker, err := client.GetTickers()
+	ticker, err := client.GetMarketDepth("DAIUSD")
 	if err != nil {
 		fmt.Printf("%s", err)
 	}

@@ -9,8 +9,9 @@ import(
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	//"strconv"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -25,9 +26,9 @@ var publicMethods = []string {
 }
 
 var privateMethods = []string {
-	"Balance/Balances",				//GET
-	"Trade/Orders",					//GET/POST/DELETE
-	"ElectronicWallet/Withdrawals",	//POST
+	"Balance/Balances",
+	"Trade/Orders",
+	"ElectronicWallet/Withdrawals",
 }
 
 type GatecoinClient struct {
@@ -45,39 +46,55 @@ func NewGatecoinClient(key, secret string) (*GatecoinClient) {
 /////////////////////////////////////////////////////////////////////////
 //                          REQUEST CONSTRUCTION                       //
 /////////////////////////////////////////////////////////////////////////
-func (gatecoin *GatecoinClient) queryPublic(values url.Values, typ interface{}) (interface{}, error) {
+func (gatecoin *GatecoinClient) queryPublic(params []string, typ interface{}) (interface{}, error) {
 	//check if valid command
-	if !IsStringInSlice(values.Get("command"), publicMethods) {
-		return nil, fmt.Errorf("[Gatecoin] (queryPublic) The method %s is not in the supported Public Methods list.", values.Get("command"))
+	cmd := params[0]
+	if !IsStringInSlice(cmd, publicMethods) {
+		return nil, fmt.Errorf("[Gatecoin] (queryPublic) The method %s is not in the supported Public Methods list.", cmd)
 	}
 	//format request URL w/ path and URL parameters
 	reqURL, _ := url.Parse(APIHostUrl)
 	reqURL.Path = "/Public"
-	reqURL.RawQuery = values.Encode()
-	values = nil
+	for _, param := range params {
+		reqURL.Path += "/" + param
+	}
 
 	//set type of request
 	requestType := "GET"
-	resp, err := gatecoin.doRequest(reqURL, requestType, values, nil, typ)
+	resp, err := gatecoin.doRequest(reqURL, requestType, nil, nil, typ)
 	return resp, err
 }
 
-/*
-func (gatecoin *GatecoinClient) queryPrivate(values url.Values, responseType interface{}) (interface{}, error) {
-	cmd := values.Get("command)")
+func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string, responseType interface{}) (interface{}, error) {
+	cmd := params[0]
 	//check if valid command
 	if !IsStringInSlice(cmd, privateMethods) {
 		return nil, fmt.Errorf("[Gatecoin] (queryPrivate) The method %s is not in the supposed Private Methods list.", cmd)
 	}
 
 	//Set url for request
-	reqURL, _ := url.Parse(APIHostUrl)	//sets scheme to https - host to gatecoin.com
-	reqURL.Path = "/" + cmd
+	reqURL, _ := url.Parse(APIHostUrl)
+	for _, param := range params {
+		if param != "" {
+			reqURL.Path += "/" + param
+		}
+	}
 
-	//UNFINISHED
-	return 
+	//Add timestamp
+	reqURL.Path += strconv.FormatInt(time.Now().UnixNano(), 10)
+
+	//Create signature using secret
+	signature := createSignature(reqURL.Path, gatecoin.secret)
+
+	//Add api key and encrypted signature to headers
+	headers := map[string]string {
+		"Key": gatecoin.key,
+		"Sign": signature,
+	}
+
+	resp, err := gatecoin.doRequest(reqURL, requestType, nil, headers, responseType)
+	return resp, err
 }
-*/
 
 func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, values url.Values, headers map[string]string, responseType interface{}) (interface{}, error) {
 	//Create request
@@ -138,7 +155,7 @@ func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, v
 
 func (gatecoin *GatecoinClient) GetTickers() (*TickersResponse, error) {
 	resp, err := gatecoin.queryPublic(
-		url.Values{ "command": []string{"LiveTickers"}},
+		[]string{"LiveTickers"},
 		&TickersResponse{})
 	if err != nil {
 		return nil, err
@@ -149,12 +166,83 @@ func (gatecoin *GatecoinClient) GetTickers() (*TickersResponse, error) {
 func (gatecoin *GatecoinClient) GetMarketDepth(pair string) (*MarketDepthResponse, error) {
 	//Make request
 	resp, err := gatecoin.queryPublic(
-		url.Values { "command": []string{"MarketDepth"}},
+		[]string{"MarketDepth", pair},
 		&MarketDepthResponse{})
 	if err != nil {
 		return nil, err
 	}
 	return resp.(*MarketDepthResponse), nil
+}
+
+func (gatecoin *GatecoinClient) GetTransactions(pair string) (*TransactionsResponse, error) {
+	resp, err := gatecoin.queryPublic(
+		[]string{"Transactions", pair},
+		&TransactionsResponse{})
+	if err != nil {
+		return nil, err
+	}
+	return resp.(*TransactionsResponse), nil
+}
+
+/////////////////////////////////////////////////////////////////////////
+//                          PRIVATE API METHODS                        //
+/////////////////////////////////////////////////////////////////////////
+
+func (gatecoin *GatecoinClient) GetBalances(pair string) (*BalancesResponse, error) {
+	resp, err := gatecoin.queryPrivate(
+		"GET",
+		[]string{"Balance/Balances", pair},
+		&BalancesResponse{})
+	if err != nil {
+		return nil, err
+	}
+	return resp.(*BalancesResponse), nil
+}
+
+//UNFINISHED - args and formatting
+func (gatecoin *GatecoinClient) CreateOrder() (*CreateOrderResponse, error) {
+	resp, err := gatecoin.queryPrivate(
+		"POST",
+		[]string{"Trade/Orders"},
+		&CreateOrderResponse{})
+	if err != nil {
+		return nil, err
+	}
+	return resp.(*CreateOrderResponse), nil
+}
+
+func (gatecoin *GatecoinClient) GetOrder(id string) (*GetOrderResponse, error) {
+	resp, err := gatecoin.queryPrivate(
+		"GET",
+		[]string{"Trade/Orders", id},
+		&GetOrderResponse{})
+	if err != nil {
+		return nil, err
+	}
+	return resp.(*GetOrderResponse), nil
+} 
+
+func (gatecoin *GatecoinClient) DeleteOrder(id string) (*KillOrderResponse, error) {
+	resp, err := gatecoin.queryPrivate(
+		"DELETE",
+		[]string{"Trade/Orders", id},
+		&KillOrderResponse{})
+	if err != nil {
+		return nil, err
+	}
+	return resp.(*KillOrderResponse), nil
+}
+
+//UNFINISHED - args and formatting 
+func (gatecoin *GatecoinClient) Withdraw(currency string) (*WithdrawResponse, error) {
+	resp, err := gatecoin.queryPrivate(
+		"POST",
+		[]string{"ElectronicWallet/Withdrawals", currency},
+		&WithdrawResponse{})
+	if err != nil {
+		return nil, err
+	}
+	return resp.(*WithdrawResponse), nil
 }
 
 /////////////////////////////////////////////////////////////////////////

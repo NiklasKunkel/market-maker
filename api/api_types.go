@@ -38,7 +38,7 @@ type Offer 	struct {
 	Volume 	float64 	`json:"volume,omitempty"`
 }
 
-type TransactionResponse struct {
+type TransactionsResponse struct {
 	Transactions []Transaction 	`json:"transactions,omitempty"`
 	Status 	ResponseStatus 		`json:"responseStatus,omitempty"`
 }
@@ -93,7 +93,7 @@ type Order struct {
 	Date 			string 	`json:"date,omitempty"`
 }
 
-type DeleteOrderResponse struct {
+type KillOrderResponse struct {
 	Status 	ResponseStatus 	`json:"responseStatus,omitempty"`
 }
 
