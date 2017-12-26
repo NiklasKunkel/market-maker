@@ -2,7 +2,7 @@ package api
 
 import(
 	"crypto/hmac"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -42,7 +42,6 @@ func NewGatecoinClient(key, secret string) (*GatecoinClient) {
 	return &GatecoinClient{key, secret, client}
 }
 
-
 /////////////////////////////////////////////////////////////////////////
 //                          REQUEST CONSTRUCTION                       //
 /////////////////////////////////////////////////////////////////////////
@@ -80,16 +79,27 @@ func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string
 		}
 	}
 
-	//Add timestamp
-	reqURL.Path += strconv.FormatInt(time.Now().UnixNano(), 10)
+	//set content type
+	var contentType string
+	if requestType != "GET" {
+		contentType = "application/json"
+	}
+
+	//set nonce
+	nonce := strconv.FormatInt(time.Now().Unix(), 10) + ".000"
+
+	//construct message
+	msg := fmt.Sprintf("%s %s%s%s",requestType, reqURL, contentType, nonce)
+	fmt.Printf("Message = %s\n", msg)
 
 	//Create signature using secret
-	signature := createSignature(reqURL.Path, gatecoin.secret)
+	signature := createSignature(strings.ToLower(msg), gatecoin.secret)
 
 	//Add api key and encrypted signature to headers
 	headers := map[string]string {
-		"Key": gatecoin.key,
-		"Sign": signature,
+		"API_PUBLIC_KEY": gatecoin.key,
+		"API_REQUEST_SIGNATURE": signature,
+		"API_REQUEST_DATE": nonce,
 	}
 
 	resp, err := gatecoin.doRequest(reqURL, requestType, nil, headers, responseType)
@@ -106,9 +116,7 @@ func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, v
 	//Add headers to request
 	req.Header.Set("User-Agent", APIUserAgent)
 	req.Header.Set("Accept", "application/json")
-	if req.Header.Set("Content-Type", ""); requestType != "GET" {
-		req.Header.Set("Content-Type", "application/json")
-	}
+
 	for key, value := range headers {
 		req.Header.Add(key, value)
 	}
@@ -250,15 +258,15 @@ func (gatecoin *GatecoinClient) Withdraw(currency string) (*WithdrawResponse, er
 /////////////////////////////////////////////////////////////////////////
 
 ///Creates a hmac hash with sha512
-func getHMacSha512(msg string, secret string) []byte {
-	hmac := hmac.New(sha512.New, []byte(secret))
+func getHMacSha256(msg string, secret string) []byte {
+	hmac := hmac.New(sha256.New, []byte(secret))
 	hmac.Write([]byte(strings.ToLower(msg)))
 	return hmac.Sum(nil)
 }
 
 //Creates signature for our HTTP requests
 func createSignature(msg string, secret string) string {
-	sum := getHMacSha512(msg, secret)
+	sum := getHMacSha256(msg, secret)
 	return hex.EncodeToString(sum)
 }
 
