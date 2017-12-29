@@ -1,9 +1,10 @@
 package api
 
 import(
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -60,11 +61,11 @@ func (gatecoin *GatecoinClient) queryPublic(params []string, typ interface{}) (i
 
 	//set type of request
 	requestType := "GET"
-	resp, err := gatecoin.doRequest(reqURL, requestType, nil, nil, typ)
+	resp, err := gatecoin.doRequest(reqURL, requestType, nil, []byte{}, typ)
 	return resp, err
 }
 
-func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string, responseType interface{}) (interface{}, error) {
+func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string, data []byte, responseType interface{}) (interface{}, error) {
 	cmd := params[0]
 	//check if valid command
 	if !IsStringInSlice(cmd, privateMethods) {
@@ -89,11 +90,11 @@ func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string
 	nonce := strconv.FormatInt(time.Now().Unix(), 10) + ".000"
 
 	//construct message
-	msg := fmt.Sprintf("%s %s%s%s",requestType, reqURL, contentType, nonce)
+	msg := fmt.Sprintf("%s%s%s%s",requestType, reqURL, contentType, nonce)
 	fmt.Printf("Message = %s\n", msg)
 
 	//Create signature using secret
-	signature := createSignature(strings.ToLower(msg), gatecoin.secret)
+	signature := createSignature(msg, gatecoin.secret)
 
 	//Add api key and encrypted signature to headers
 	headers := map[string]string {
@@ -102,13 +103,13 @@ func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string
 		"API_REQUEST_DATE": nonce,
 	}
 
-	resp, err := gatecoin.doRequest(reqURL, requestType, nil, headers, responseType)
+	resp, err := gatecoin.doRequest(reqURL, requestType, headers, data, responseType)
 	return resp, err
 }
 
-func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, values url.Values, headers map[string]string, responseType interface{}) (interface{}, error) {
+func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, headers map[string]string, data []byte, responseType interface{}) (interface{}, error) {
 	//Create request
-	req, err := http.NewRequest(requestType, reqURL.String(), strings.NewReader(values.Encode()))
+	req, err := http.NewRequest(requestType, reqURL.String(), bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("[Gatecoin] (doRequest) Could not execute request to %s (%s)", reqURL, err.Error())
 	}
@@ -200,6 +201,7 @@ func (gatecoin *GatecoinClient) GetBalances(pair string) (*BalancesResponse, err
 	resp, err := gatecoin.queryPrivate(
 		"GET",
 		[]string{"Balance/Balances", pair},
+		[]byte{},
 		&BalancesResponse{})
 	if err != nil {
 		return nil, err
@@ -208,10 +210,18 @@ func (gatecoin *GatecoinClient) GetBalances(pair string) (*BalancesResponse, err
 }
 
 //UNFINISHED - args and formatting
-func (gatecoin *GatecoinClient) CreateOrder() (*CreateOrderResponse, error) {
+func (gatecoin *GatecoinClient) CreateOrder(pair string, way string, amount float64, price float64) (*CreateOrderResponse, error) {
+	//compose order obj
+	order := NewOrder{pair, way, amount, price}
+	//convert to json string
+	orderJson, err := json.Marshal(order)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := gatecoin.queryPrivate(
 		"POST",
 		[]string{"Trade/Orders"},
+		orderJson,
 		&CreateOrderResponse{})
 	if err != nil {
 		return nil, err
@@ -223,6 +233,7 @@ func (gatecoin *GatecoinClient) GetOrder(id string) (*GetOrderResponse, error) {
 	resp, err := gatecoin.queryPrivate(
 		"GET",
 		[]string{"Trade/Orders", id},
+		[]byte{},
 		&GetOrderResponse{})
 	if err != nil {
 		return nil, err
@@ -234,6 +245,7 @@ func (gatecoin *GatecoinClient) DeleteOrder(id string) (*KillOrderResponse, erro
 	resp, err := gatecoin.queryPrivate(
 		"DELETE",
 		[]string{"Trade/Orders", id},
+		[]byte{},
 		&KillOrderResponse{})
 	if err != nil {
 		return nil, err
@@ -246,6 +258,7 @@ func (gatecoin *GatecoinClient) Withdraw(currency string) (*WithdrawResponse, er
 	resp, err := gatecoin.queryPrivate(
 		"POST",
 		[]string{"ElectronicWallet/Withdrawals", currency},
+		[]byte{},
 		&WithdrawResponse{})
 	if err != nil {
 		return nil, err
@@ -259,7 +272,7 @@ func (gatecoin *GatecoinClient) Withdraw(currency string) (*WithdrawResponse, er
 
 ///Creates a hmac hash with sha512
 func getHMacSha256(msg string, secret string) []byte {
-	hmac := hmac.New(sha256.New, []byte(secret))
+	hmac := hmac.New(sha256.New,[]byte(secret))
 	hmac.Write([]byte(strings.ToLower(msg)))
 	return hmac.Sum(nil)
 }
@@ -267,7 +280,9 @@ func getHMacSha256(msg string, secret string) []byte {
 //Creates signature for our HTTP requests
 func createSignature(msg string, secret string) string {
 	sum := getHMacSha256(msg, secret)
-	return hex.EncodeToString(sum)
+	hashInBase64 := base64.StdEncoding.EncodeToString(sum)
+	fmt.Printf("encrypting message: %s\nsecret in bytes: %+v\nsecret string: %s\nsha-256 []byte: %+v\nsha-256 string: %s\nbase-64 string: %s\n", strings.ToLower(msg), []byte(secret), secret, sum, string(sum[:]), hashInBase64)
+	return hashInBase64
 }
 
 /////////////////////////////////////////////////////////////////////////

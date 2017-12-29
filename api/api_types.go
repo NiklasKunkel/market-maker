@@ -74,6 +74,13 @@ type CreateOrderResponse struct {
 	Status 		ResponseStatus 	`json:"responseStatus,omitempty"`
 }
 
+type NewOrder struct {
+	Pair 	string	`json:"pair,omitempty"`
+	Way 	string	`json:"way,omitempty"`
+	Amount 	float64	`json:"amount,omitempty"`
+	Price 	float64	`json:"price,omitempty"`
+}
+
 type GetOrderResponse struct {
 	Orders 	[]Order 		`json:"orders,omitempty"`
 	Status 	ResponseStatus 	`json:"responseStatus,omitempty"`

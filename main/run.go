@@ -35,7 +35,7 @@ func main() {
 	fmt.Printf("%+v", transactions)
 
 	//Test Private Queries
-	balances, err := client.GetBalances("DAI")
+	balances, err := client.GetBalances("")
 	if err != nil {
 		fmt.Printf("%s", err)
 	}
