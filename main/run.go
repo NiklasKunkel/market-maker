@@ -50,7 +50,7 @@ func main() {
 
 type auth struct {
 	Key		string	`json:"apiKey"`
-	Secret	string 	`json:"secretKey"`
+	Secret	string 	`json:"apiSecret"`
 }
 
 func ReadConfig(credentials *auth) {
@@ -63,5 +63,6 @@ func ReadConfig(credentials *auth) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Printf("api key = %s\napi secret = %s\n", credentials.Key, credentials.Secret)
 	return
 }

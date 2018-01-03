@@ -281,7 +281,7 @@ func getHMacSha256(msg string, secret string) []byte {
 func createSignature(msg string, secret string) string {
 	sum := getHMacSha256(msg, secret)
 	hashInBase64 := base64.StdEncoding.EncodeToString(sum)
-	fmt.Printf("encrypting message: %s\nsecret in bytes: %+v\nsecret string: %s\nsha-256 []byte: %+v\nsha-256 string: %s\nbase-64 string: %s\n", strings.ToLower(msg), []byte(secret), secret, sum, string(sum[:]), hashInBase64)
+	//fmt.Printf("encrypting message: %s\nsecret in bytes: %+v\nsecret string: %s\nsha-256 []byte: %+v\nsha-256 string: %s\nbase-64 string: %s\n", strings.ToLower(msg), []byte(secret), secret, sum, string(sum[:]), hashInBase64)
 	return hashInBase64
 }
 
