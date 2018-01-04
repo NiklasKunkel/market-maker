@@ -1,17 +1,21 @@
 package api
 
 type ResponseStatus struct {
-	ErrorCode 	string 			`json:"errorCode,omitempty"`
-	Message 	string 			`json:"message,omitempty"`
+	ErrorCode 	string 			`json:"errorCode"`
+	Message 	string 			`json:"message"`
+}
+
+type ErrorResponse struct {
+	Status 	ResponseStatus 		`json:"responseStatus"`
 }
 
 type TickersResponse struct {
-	Tickers 	[]Ticker		`json:"tickers,omitempty"`
-	Status 		ResponseStatus	`json:"responseStatus,omitempty"`
+	Tickers 	[]Ticker		`json:"tickers"`
+	Status 		ResponseStatus	`json:"responseStatus"`
 }
 
 type Ticker struct {
-	Pair 	string 		`json:"currencyPair,omitempty"`
+	Pair 	string 		`json:"currencyPair"`
 	Open 	float64 	`json:"open,omitmepty"`
 	Last 	float64 	`json:"last,omitmepty"`
 	LastQ 	float64 	`json:"lastQ,omitmepty"`
@@ -24,86 +28,86 @@ type Ticker struct {
 	ask 	float64 	`json:"ask,omitmepty"`
 	askQ 	float64 	`json:"askQ,omitmepty"`
 	Vwap 	float64 	`json:"vwap,omitmepty"`
-	Time 	int64 		`json:"createDateTime,omitempty"`
+	Time 	string 		`json:"createDateTime"`
 }
 
 type MarketDepthResponse struct {
-	Asks 	[]Offer		`json:"asks,omitempty"`
-	Bids 	[]Offer 	`json:"bids,omitempty"`
-	Status 	ResponseStatus 	`json:"responseStatus,omitempty"`
+	Asks 	[]Offer		`json:"asks"`
+	Bids 	[]Offer 	`json:"bids"`
+	Status 	ResponseStatus 	`json:"responseStatus"`
 }
 
 type Offer 	struct {
-	Price 	float64  	`json:"price,omitempty"`
-	Volume 	float64 	`json:"volume,omitempty"`
+	Price 	float64  	`json:"price"`
+	Volume 	float64 	`json:"volume"`
 }
 
 type TransactionsResponse struct {
-	Transactions []Transaction 	`json:"transactions,omitempty"`
-	Status 	ResponseStatus 		`json:"responseStatus,omitempty"`
+	Transactions []Transaction 	`json:"transactions"`
+	Status 	ResponseStatus 		`json:"responseStatus"`
 }
 
 type Transaction struct {
-	Id 			int64 		`json:"transactionId,omitempty"`
-	Time 		int64		`json:"transactionTime,omitempty"`
-	Price 		float64 	`json:"price,omitempty"`
-	Quantity 	float64 	`json:"quantity,omitempty"`
-	Pair 		string 		`json:"currencyPair,omitempty"`
-	Way 		string 		`json:"way,omitempty"`
-	AskId 		string 		`json:"askOrderId,omitempty"`
-	BidId 		string 		`json:"bidOrderId,omitempty"`
+	Id 			int64 		`json:"transactionId"`
+	Time 		string		`json:"transactionTime"`
+	Price 		float64 	`json:"price"`
+	Quantity 	float64 	`json:"quantity"`
+	Pair 		string 		`json:"currencyPair"`
+	Way 		string 		`json:"way"`
+	AskId 		string 		`json:"askOrderId"`
+	BidId 		string 		`json:"bidOrderId"`
 }
 
 type BalancesResponse struct {
-	Balances 	[]Balance 		`json:"balances,omitempty"`
-	Status 		ResponseStatus 	`json:"responseStatus,omitempty"`
+	Balances 	[]Balance 		`json:"balances"`
+	Status 		ResponseStatus 	`json:"responseStatus"`
 }
 
 type Balance struct {
-	Currency 			string 		`json:"currency,omitempty"`
-	Balance 			float64 	`json:"balance,omitempty"`
-	AvailableBalance 	float64 	`json:"availableBalance,omitempty"`
-	PendingIncoming 	float64 	`json:"pendingIncoming,omitempty"`
-	PendingOutgoing 	float64 	`json:"pendingOutgoing,omitempty"`
-	OpenOrder 			int64 		`json:"openOrder,omitempty"`
-	IsDigital 			bool 		`json:"isDigital,omitempty"`
+	Currency 			string 		`json:"currency"`
+	Balance 			float64 	`json:"balance"`
+	AvailableBalance 	float64 	`json:"availableBalance"`
+	PendingIncoming 	float64 	`json:"pendingIncoming"`
+	PendingOutgoing 	float64 	`json:"pendingOutgoing"`
+	OpenOrder 			float64 		`json:"openOrder"`
+	IsDigital 			bool 		`json:"isDigital"`
 }
 
 type CreateOrderResponse struct {
-	OrderId 	string 			`json:"clOrderId,omitempty"`
-	Status 		ResponseStatus 	`json:"responseStatus,omitempty"`
+	OrderId 	string 			`json:"clOrderId"`
+	Status 		ResponseStatus 	`json:"responseStatus"`
 }
 
 type NewOrder struct {
-	Pair 	string	`json:"pair,omitempty"`
-	Way 	string	`json:"way,omitempty"`
-	Amount 	float64	`json:"amount,omitempty"`
-	Price 	float64	`json:"price,omitempty"`
+	Pair 	string	`json:"Code"`
+	Way 	string	`json:"Way"`
+	Amount 	string	`json:"Amount"`
+	Price 	string	`json:"Price"`
 }
 
 type GetOrderResponse struct {
-	Orders 	[]Order 		`json:"orders,omitempty"`
-	Status 	ResponseStatus 	`json:"responseStatus,omitempty"`
+	Orders 	[]Order 		`json:"orders"`
+	Status 	ResponseStatus 	`json:"responseStatus"`
 }
 
 type Order struct {
-	Code 			string 	`json:"code,omitempty"`
-	OrderId 		string 	`json:"clOrderId,omitemptu"`
-	Side 			int64 	`json:"side,omitempty"`
-	Price 			float64 `json:"price,omitempty"`
-	InitQuantity 	float64 `json:"initialQuantity,omitempty"`
-	RemQuantity 	float64 `json:"remainingQuantity,omitempty"`
-	Status 			int64 	`json:"status,omitempty"`
-	StatusDesc 		string 	`json:"statusDesc,omitempty"`
-	TxSeqNo 		int64 	`json:"tranSeqNo,omitempty"`
-	Type 			int64 	`json:"type,omitempty"`
-	Date 			string 	`json:"date,omitempty"`
+	Code 			string 	`json:"code"`
+	OrderId 		string 	`json:"clOrderId"`
+	Side 			int64 	`json:"side"`
+	Price 			float64 `json:"price"`
+	InitQuantity 	float64 `json:"initialQuantity"`
+	RemQuantity 	float64 `json:"remainingQuantity"`
+	Status 			int64 	`json:"status"`
+	StatusDesc 		string 	`json:"statusDesc"`
+	TxSeqNo 		int64 	`json:"tranSeqNo"`
+	Type 			int64 	`json:"type"`
+	Date 			string 	`json:"date"`
 }
 
 type KillOrderResponse struct {
-	Status 	ResponseStatus 	`json:"responseStatus,omitempty"`
+	Status 	ResponseStatus 	`json:"responseStatus"`
 }
 
 type WithdrawResponse struct {
-	Status 	ResponseStatus 	`json:"responseStatus,omitempty"`
+	Status 	ResponseStatus 	`json:"responseStatus"`
 }

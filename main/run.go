@@ -18,32 +18,40 @@ func main() {
 	//Test Public Queries
 	ticker, err := client.GetTickers()
 	if err != nil {
-		fmt.Printf("%s", err)
+		fmt.Printf("%s", err.Error())
 	}
 	fmt.Printf("%+v", ticker)
 
 	marketDepth, err := client.GetMarketDepth("DAIUSD")
 	if err != nil {
-		fmt.Printf("%s", err)
+		fmt.Printf("%s", err.Error())
 	}
 	fmt.Printf("%+v", marketDepth)
 
-	transactions, err := client.GetTransactions("DAIUSD")
+	transactions, err := client.GetTransactions("BTCUSD")
 	if err != nil {
-		fmt.Printf("%s", err)
+		fmt.Printf("%s", err.Error())
 	}
 	fmt.Printf("%+v", transactions)
 
 	//Test Private Queries
 	balances, err := client.GetBalances("")
 	if err != nil {
-		fmt.Printf("%s", err)
+		fmt.Printf("%s", err.Error())
 	}
 	fmt.Printf("%+v", balances)
 
-	//
+	resp, err := client.CreateOrder("BTCUSD", "bid", "1", "0.001")
+	if err != nil {
+		fmt.Printf("%s\n", err.Error())
+	}
+	fmt.Printf("%+v\n", resp)
 
-
+	order, err := client.GetOrder()
+	if err != nil {
+		fmt.Printf("%s\n", err.Error())
+	}
+	fmt.Printf("%+v\n", order)
 
 	return
 }

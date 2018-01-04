@@ -10,6 +10,7 @@ import(
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	//"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -91,7 +92,6 @@ func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string
 
 	//construct message
 	msg := fmt.Sprintf("%s%s%s%s",requestType, reqURL, contentType, nonce)
-	fmt.Printf("Message = %s\n", msg)
 
 	//Create signature using secret
 	signature := createSignature(msg, gatecoin.secret)
@@ -108,6 +108,7 @@ func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string
 }
 
 func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, headers map[string]string, data []byte, responseType interface{}) (interface{}, error) {
+	//fmt.Printf("\nData = %s\n", data)
 	//Create request
 	req, err := http.NewRequest(requestType, reqURL.String(), bytes.NewReader(data))
 	if err != nil {
@@ -116,7 +117,8 @@ func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, h
 
 	//Add headers to request
 	req.Header.Set("User-Agent", APIUserAgent)
-	req.Header.Set("Accept", "application/json")
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Content-Type", "application/json")
 
 	for key, value := range headers {
 		req.Header.Add(key, value)
@@ -142,20 +144,24 @@ func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, h
 
 	if err != nil {
 		return nil, fmt.Errorf("[Gatecoin] (doRequest) Failed to parse response for query to %s! (%s)", reqURL, err.Error())
-	} 
+	}
 
 	//Convert JSON to ErrorResponse struct to check if API returned error
-	apiError := ResponseStatus{}
-	json.Unmarshal(body, &apiError)
-	if apiError.Message != "OK" {
-		return nil, fmt.Errorf("Error Code %s, %s", apiError.ErrorCode, apiError.Message)
+	apiError := ErrorResponse{}
+	err = json.Unmarshal(body, &apiError)
+	if err != nil {
+		return nil, fmt.Errorf("[Gatecoin] (doRequest) Failed to convert JSON response into error struct for query to %s! (%s)", reqURL, err.Error())
+	}
+	if apiError.Status.Message != "OK" {
+		return nil, fmt.Errorf("Error => ErrorCode = %s, Message = %s\n", apiError.Status.ErrorCode, apiError.Status.Message)
 	}
 
 	//Convert JSON to Response struct
 	err = json.Unmarshal(body, &responseType)
 	if err != nil {
-		return nil, fmt.Errorf("[Gatecoin] (doRequest) Failed to convert response into JSON for query to %s! (%s)", reqURL, err.Error())
+		return nil, fmt.Errorf("[Gatecoin] (doRequest) Failed to convert JSON response into struct for query to %s! (%s)", reqURL, err.Error())
 	}
+
 	return responseType, nil
 }
 /////////////////////////////////////////////////////////////////////////
@@ -183,6 +189,7 @@ func (gatecoin *GatecoinClient) GetMarketDepth(pair string) (*MarketDepthRespons
 	return resp.(*MarketDepthResponse), nil
 }
 
+//TODO - add TransactionID as query parameter ?TransactionId=BK11538053033
 func (gatecoin *GatecoinClient) GetTransactions(pair string) (*TransactionsResponse, error) {
 	resp, err := gatecoin.queryPublic(
 		[]string{"Transactions", pair},
@@ -210,11 +217,12 @@ func (gatecoin *GatecoinClient) GetBalances(pair string) (*BalancesResponse, err
 }
 
 //UNFINISHED - args and formatting
-func (gatecoin *GatecoinClient) CreateOrder(pair string, way string, amount float64, price float64) (*CreateOrderResponse, error) {
+func (gatecoin *GatecoinClient) CreateOrder(pair string, way string, amount string, price string) (*CreateOrderResponse, error) {
 	//compose order obj
 	order := NewOrder{pair, way, amount, price}
 	//convert to json string
 	orderJson, err := json.Marshal(order)
+	fmt.Printf("\nOrder JSON string = %s\n", orderJson)
 	if err != nil {
 		return nil, err
 	}
@@ -229,10 +237,10 @@ func (gatecoin *GatecoinClient) CreateOrder(pair string, way string, amount floa
 	return resp.(*CreateOrderResponse), nil
 }
 
-func (gatecoin *GatecoinClient) GetOrder(id string) (*GetOrderResponse, error) {
+func (gatecoin *GatecoinClient) GetOrder() (*GetOrderResponse, error) {
 	resp, err := gatecoin.queryPrivate(
 		"GET",
-		[]string{"Trade/Orders", id},
+		[]string{"Trade/Orders"},
 		[]byte{},
 		&GetOrderResponse{})
 	if err != nil {
@@ -281,7 +289,6 @@ func getHMacSha256(msg string, secret string) []byte {
 func createSignature(msg string, secret string) string {
 	sum := getHMacSha256(msg, secret)
 	hashInBase64 := base64.StdEncoding.EncodeToString(sum)
-	//fmt.Printf("encrypting message: %s\nsecret in bytes: %+v\nsecret string: %s\nsha-256 []byte: %+v\nsha-256 string: %s\nbase-64 string: %s\n", strings.ToLower(msg), []byte(secret), secret, sum, string(sum[:]), hashInBase64)
 	return hashInBase64
 }
 
