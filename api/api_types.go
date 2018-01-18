@@ -11,7 +11,7 @@ type ErrorResponse struct {
 
 type TickersResponse struct {
 	Tickers 	[]Ticker		`json:"tickers"`
-	Status 		ResponseStatus	`json:"responseStatus"`
+	Status 		ResponseStatus 	`json:"responseStatus"`
 }
 
 type Ticker struct {
@@ -64,17 +64,17 @@ type BalancesResponse struct {
 }
 
 type Balance struct {
-	Currency 			string 		`json:"currency"`
-	Balance 			float64 	`json:"balance"`
-	AvailableBalance 	float64 	`json:"availableBalance"`
-	PendingIncoming 	float64 	`json:"pendingIncoming"`
-	PendingOutgoing 	float64 	`json:"pendingOutgoing"`
-	OpenOrder 			float64 		`json:"openOrder"`
-	IsDigital 			bool 		`json:"isDigital"`
+	Currency 			string		`json:"currency"`
+	Balance 			float64		`json:"balance"`
+	AvailableBalance 	float64		`json:"availableBalance"`
+	PendingIncoming 	float64		`json:"pendingIncoming"`
+	PendingOutgoing 	float64		`json:"pendingOutgoing"`
+	OpenOrder 			float64		`json:"openOrder"`
+	IsDigital 			bool		`json:"isDigital"`
 }
 
 type CreateOrderResponse struct {
-	OrderId 	string 			`json:"clOrderId"`
+	OrderId 	string			`json:"clOrderId"`
 	Status 		ResponseStatus 	`json:"responseStatus"`
 }
 

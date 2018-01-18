@@ -216,7 +216,6 @@ func (gatecoin *GatecoinClient) GetBalances(pair string) (*BalancesResponse, err
 	return resp.(*BalancesResponse), nil
 }
 
-//UNFINISHED - args and formatting
 func (gatecoin *GatecoinClient) CreateOrder(pair string, way string, amount string, price string) (*CreateOrderResponse, error) {
 	//compose order obj
 	order := NewOrder{pair, way, amount, price}
@@ -237,7 +236,7 @@ func (gatecoin *GatecoinClient) CreateOrder(pair string, way string, amount stri
 	return resp.(*CreateOrderResponse), nil
 }
 
-func (gatecoin *GatecoinClient) GetOrder() (*GetOrderResponse, error) {
+func (gatecoin *GatecoinClient) GetOrders() (*GetOrderResponse, error) {
 	resp, err := gatecoin.queryPrivate(
 		"GET",
 		[]string{"Trade/Orders"},

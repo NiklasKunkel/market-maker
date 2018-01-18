@@ -1,0 +1,27 @@
+{
+    "buyBands": [
+        {
+            "minMargin": 0.002344,
+            "avgMargin": 0.004689,
+            "maxMargin": 0.009378,
+            "bandSize": 0.09,
+            "minAmount": 10.0,
+            "avgAmount": 40.0,
+            "maxAmount": 80.0,
+            "dustCutoff": 0.0
+        }
+
+],
+    "sellBands": [
+        {
+            "minMargin": 0.000428,
+            "avgMargin": 0.000856,
+            "maxMargin": 0.001711,
+            "bandSize": 0.09,
+            "minAmount": 0.01,
+            "avgAmount": 0.1,
+            "maxAmount": 0.15,
+            "dustCutoff": 0.0
+        }
+    ]
+}
