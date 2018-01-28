@@ -181,44 +181,52 @@ func Test_Band_VerifyBand7(t *testing.T) {
 }
 
 func Test_Band_ExecessiveOrders1(t *testing.T) {
-	bBand := BuyBand{Band{0.1, 0.8, 0.99999, 4.0, 6.0, 8.0, 0.01}}	//create buy band
-	targetPrice := 8.5												//set ref price to 8.5
-	bidOrders := []*Order{											//create orders
-		&Order{"DAIUSD", "BK01", 1, 1.000428, 14.13, 1, 1, "New", 0, 0, "1515755945"},
-		&Order{"DAIUSD", "BK02", 1, 1.000502, 10.17, 2, 1, "New", 0, 0, "1515755945"},
-		&Order{"DAIUSD", "BK03", 1, 1.000675, 11.84, 3, 1, "New", 0, 0, "1515755945"},
-		&Order{"DAIUSD", "BK04", 1, 1.000788, 12.96, 4, 1, "New", 0, 0, "1515755945"},
+	sBand := SellBand{Band{0.1, 0.15, 0.2, 4.0, 6.0, 8.0, 0.01}}	//create buy band
+	//MinMargin - 0.1, MaxMargin = 0.2, MinAmount = 4, MaxAmount < 8
+	targetPrice := 1.0												//set ref price to 8.5
+	//With RefPrice of 1.0 -> MinPrice = 1.1 & MaxPrice = 1.2
+	askOrders := []*Order{					 						//create orders
+		&Order{"DAIUSD", "BK01", 1, 1.1, 14.13, 1, 1, "New", 0, 0, "1515755945"},	//Order in-band
+		&Order{"DAIUSD", "BK02", 1, 1.12, 10.17, 2, 1, "New", 0, 0, "1515755945"},	//Order in-band
+		&Order{"DAIUSD", "BK03", 1, 1.16, 11.84, 3, 1, "New", 0, 0, "1515755945"},	//Order in-band
+		&Order{"DAIUSD", "BK04", 1, 1.20, 12.96, 4, 1, "New", 0, 0, "1515755945"},	//Order in-band
 	}
-	ordersToKill := bBand.ExcessiveOrders(bidOrders, targetPrice)	//find which orders need to be cancelled to stay under band.MaxAmount
-	assert.Contains(t, ordersToKill, bidOrders[2])					//check that order BK03 was selected to be cancelled
+	ordersToKill := sBand.ExcessiveOrders(askOrders, targetPrice)	//find which orders need to be cancelled to stay under band.MaxAmount
+	assert.Contains(t, ordersToKill, askOrders[2])					//check that order BK03 was selected to be cancelled
 	assert.Equal(t, len(ordersToKill), 1)							//check that no other orders were specified to be cancelled
 }
 
 func Test_Band_ExecessiveOrders2(t *testing.T) {
-	bBand := BuyBand{Band{0.0023, 0.0065, 0.0093, 4.0, 6.0, 8.0, 0.01}}	//create buy band
+	bBand := BuyBand{Band{0.1, 0.11, 0.2, 4.0, 6.0, 7.0, 0.01}}	//create buy band
+	//MinMargin - 0.1, MaxMargin = 0.2, MinAmount = 4, MaxAmount < 7
 	targetPrice := 1.0													//set ref price to 1.0
+	//With RefPrice of 1.0 -> MinPrice = 0.9 & MaxPrice = 0.8
 	bidOrders := []*Order{												//create orders
-		&Order{"DAIUSD", "BK01", 1, 0.9907, 14.13, 1, 1, "New", 0, 0, "1515755945"},
-		&Order{"DAIUSD", "BK02", 1, 0.9914, 10.17, 2, 1, "New", 0, 0, "1515755945"},
-		&Order{"DAIUSD", "BK03", 1, 0.9965, 11.84, 3, 1, "New", 0, 0, "1515755945"},
-		&Order{"DAIUSD", "BK04", 1, 0.9977, 12.96, 4, 1, "New", 0, 0, "1515755945"},
+		&Order{"DAIUSD", "BK01", 0, 0.8907, 14.13, 1, 1, "New", 0, 0, "1515755945"},	//Order in-band
+		&Order{"DAIUSD", "BK02", 0, 0.8714, 10.17, 2, 1, "New", 0, 0, "1515755945"},	//Order in-band
+		&Order{"DAIUSD", "BK03", 0, 0.8465, 11.84, 3, 1, "New", 0, 0, "1515755945"},	//Order in-band
+		&Order{"DAIUSD", "BK04", 0, 0.8277, 12.96, 4, 1, "New", 0, 0, "1515755945"},	//Order in-band
 	}
 	ordersToKill := bBand.ExcessiveOrders(bidOrders, targetPrice)		//find which orders need to be cancelled to stay under band.MaxAmount
-	assert.Contains(t, ordersToKill, bidOrders[2])						//check that order BK03 was selected to be cancelled
+	assert.Contains(t, ordersToKill, bidOrders[3])						//check that order BK03 was selected to be cancelled
 	assert.Equal(t, len(ordersToKill), 1)								//check that no other orders were specified to be cancelled
 }
 
 func Test_Band_ExecessiveOrders3(t *testing.T) {
-	bBand := BuyBand{Band{0.0023, 0.0065, 0.0093, 4.0, 6.0, 8.0, 0.01}}	//create buy band
-	targetPrice := 8.5													//set ref price to 8.5
+	bBand := BuyBand{Band{0.01, 0.013, 0.02, 4.0, 6.0, 8.0, 0.01}}	//create buy band
+	//MinMargin - 0.01, MaxMargin = 0.02, MinAmount = 4, MaxAmount < 8
+	targetPrice := 1.0													//set ref price to 1.0
+	//With RefPrice of 1.0 -> MinPrice = 0.9 & MaxPrice = 0.8
 	bidOrders := []*Order{												//create orders
-		&Order{"DAIUSD", "BK01", 1, 0.9907, 14.13, 1, 1, "New", 0, 0, "1515755945"},
-		&Order{"DAIUSD", "BK02", 1, 0.9914, 10.17, 2, 1, "New", 0, 0, "1515755945"},
-		&Order{"DAIUSD", "BK03", 1, 0.9965, 11.84, 3, 1, "New", 0, 0, "1515755945"},
-		&Order{"DAIUSD", "BK04", 1, 0.9977, 12.96, 4, 1, "New", 0, 0, "1515755945"},
+		&Order{"DAIUSD", "BK00", 0, 0.9952, 7.21, 1, 1, "New", 0, 0, "1515755945"},		//Order out-of-band
+		&Order{"DAIUSD", "BK01", 0, 0.9899, 14.13, 1, 1, "New", 0, 0, "1515755945"},	//Order in-band
+		&Order{"DAIUSD", "BK02", 0, 0.9877, 10.17, 2, 1, "New", 0, 0, "1515755945"},	//Order in-band
+		&Order{"DAIUSD", "BK03", 0, 0.9832, 11.84, 3, 1, "New", 0, 0, "1515755945"},	//Order in-band
+		&Order{"DAIUSD", "BK04", 0, 0.9801, 12.96, 4, 1, "New", 0, 0, "1515755945"},	//Order in-band
+		&Order{"DAIUSD", "BK05", 0, 0.9762, 8.32, 1, 1, "New", 0, 0, "1515755945"},		//Order out-of-band
 	}
 	ordersToKill := bBand.ExcessiveOrders(bidOrders, targetPrice)		//find which orders need to be cancelled to stay under band.MaxAmount
-	assert.Contains(t, ordersToKill, bidOrders[2])						//check that order BK03 was selected to be cancelled
+	assert.Contains(t, ordersToKill, bidOrders[3])						//check that order BK03 was selected to be cancelled
 	assert.Equal(t, len(ordersToKill), 1)								//check that no other orders were specified to be cancelled
 }
 

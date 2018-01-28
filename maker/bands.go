@@ -176,6 +176,10 @@ type Band struct {
 	DustCutoff 	float64 	`json:"dustCutoff"`
 }
 
+type BandType interface {
+	Includes(float64, float64) bool
+}
+
 func (band *Band) VerifyBand() (error) {
 	if (band.MinMargin <= float64(0) || band.MinMargin >= float64(1) || band.MinMargin > band.AvgMargin) {
 		return fmt.Errorf("Error: Band verification failed, MinMargin(%f) > AvgMargin(%f) and must not equal zero.\n", band.MinMargin, band.AvgMargin)
@@ -200,21 +204,28 @@ func (band *Band) VerifyBand() (error) {
 
 //Returns orders which need to be cancelled to bring the total
 //order amount in the band below the maximum
-func (band *Band) ExcessiveOrders(orders []*Order, targetPrice float64) ([]*Order) {
+func (band *Band) ExcessiveOrders(orders []*Order, targetPrice float64, bandType BandType) ([]*Order) {
 	ordersInBand := []*Order{}
 	for _, order := range orders {
-		if (band.Includes(order.Price, targetPrice)) {
+		included := false
+		if t, ok := bandType.(BandType); ok {
+			included = t.Includes(order.Price, targetPrice)
+		} else {
+			included = band.Includes(order.Price, targetPrice)
+		}
+		if (included) {
 			ordersInBand = append(ordersInBand, order)
 		}
 	}
+	//Debug
 	fmt.Printf("Orders Included:\n")
 	for _, orderInBand := range ordersInBand {
 		fmt.Printf("%f\n", orderInBand.RemQuantity)
 	}
 	if (band.TotalAmount(ordersInBand) > band.MaxAmount) {
-		fmt.Printf("All Combinations:\n")
-		for size, _ := range orders {
-			band.GetAllCombinationsOfSizeN(orders, size + 1)
+		fmt.Printf("Total Order Amount Exceeded, finding orders to cancel...\nAll Combinations:\n")
+		for size, _ := range ordersInBand {
+			band.GetAllCombinationsOfSizeN(ordersInBand, size + 1)
 		}
 		fmt.Printf("\nValid Combinations:\n")
 		for _, combo := range validCombos {
@@ -245,7 +256,7 @@ func (band *Band) ExcessiveOrders(orders []*Order, targetPrice float64) ([]*Orde
 
 		ordersToKill := []*Order{}
 
-		for _, order := range orders {
+		for _, order := range ordersInBand {
 			keepOrder := false
 			for _, orderToKeep := range validCombos[maxIndex] {
 				if (order == orderToKeep) {
@@ -351,6 +362,10 @@ func (band *BuyBand) ApplyMargin(price float64, margin float64) (float64) {
 	return price * (1 - margin)
 }
 
+func (band *BuyBand) ExcessiveOrders(orders []*Order, targetPrice float64) ([]*Order) {
+	return band.Band.ExcessiveOrders(orders, targetPrice, band)
+}
+
 ///////////////////////////////////
 //         SELL BAND
 ///////////////////////////////////
@@ -374,4 +389,8 @@ func (band *SellBand) AvgPrice(targetPrice float64) (float64) {
 
 func (band *SellBand) ApplyMargin(price float64, margin float64) (float64) {
 	return price * (1 + margin)
+}
+
+func (band *SellBand) ExcessiveOrders(orders []*Order, targetPrice float64) ([]*Order) {
+	return band.Band.ExcessiveOrders(orders, targetPrice, band)
 }

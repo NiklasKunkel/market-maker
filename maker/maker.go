@@ -173,6 +173,7 @@ func getFeedPrice(currency string) {
 
 //Updates the in-memory orderbook.
 func synchronizeOrders(gatecoin *api.GatecoinClient) (error) {
+	fmt.Printf("synchronizing orderbook...\n")
 	resp, err := gatecoin.GetOrders()
 	if err != nil {
 		return fmt.Errorf("[GATECOIN] Failed to synchronize orders due to: %s\n", err.Error)
@@ -180,14 +181,19 @@ func synchronizeOrders(gatecoin *api.GatecoinClient) (error) {
 		return fmt.Errorf("[GATECOIN] Failed to synchronize orders due to: %+v\n", resp.Status)
 	}
 	//reset orderbook
-	orderBook.Asks  = nil
+	orderBook.Asks = nil
 	orderBook.Bids = nil
+	orderBook.Asks = make(map[string]Order)
+	orderBook.Bids = make(map[string]Order)
 
 	//populate orderbook
-	for _, order := range resp.Orders {
+	fmt.Printf("Orderbook:\n")
+	for i, order := range resp.Orders {
 		if (order.Side == 0) {
+			fmt.Printf("Order #%d: Bid - OrderId = %s - Price = %f - Initial Quantity = %f - Remaining Quantity = %f - Timestamp = %s\n", i, order.OrderId, order.Price, order.InitQuantity, order.RemQuantity, order.Date)
 			orderBook.Bids[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
 		} else if (order.Side == 1) {
+			fmt.Printf("Order #%d: Ask - OrderId = %s - Price = %f - Initial Quantity = %f - Remaining Quantity = %f - Timestamp = %s\n", i, order.OrderId, order.Price, order.InitQuantity, order.RemQuantity, order.Date)
 			orderBook.Asks[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
 		}
 	}
@@ -198,7 +204,5 @@ func synchronizeOrders(gatecoin *api.GatecoinClient) (error) {
 //Keep track of all actions in a log - order made - order cancelled
 	//These should be in easy to follow format, probably JSON of GetOrder(id)
 	//JSON format would help for parsing to create analytics later
-
-//Keep an internal orderbook, before doing anything call synchronizeOrders() in order to update the internal orderbook.
 //maybe dont have orderbook be a global and just have it be initialized in tupUpBands() and then passed to synchronizeOrders and topUpBuyBands and topUpSellBands
-
+//in excesside orders or in includes need to add a check for order.Side, otherwise you will have bids which get inbcluded in sell band orders because of their price.
