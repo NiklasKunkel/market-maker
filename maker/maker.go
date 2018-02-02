@@ -3,6 +3,8 @@ package maker
 import (
 	"fmt"
 	"math"
+	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"github.com/niklaskunkel/market-maker/api"
@@ -36,7 +38,6 @@ func topUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []Buy
 		fmt.Printf("[GATECOIN] Failed to get balances due to: %s\n", err.Error())
 	}
 	availableUsdBalance := availableBalances.Balances[0].AvailableBalance
-
  	buyOrders := []*Order{}
  	//iterate through bandsb 
  	for _, buyBand := range buyBands {
@@ -135,11 +136,47 @@ func cancelAllOrders(gatecoin *api.GatecoinClient) {
 	}
 }
 
-func getRefPrice(pair string) (float32) {
-	if (strings.ToLower(pair) == "dai") {
-		return 1.00
+func getFeedPrice(pair string) (float64, error) {
+	if (strings.ToUpper(pair) == "DAIUSD") {
+		return 1.00, nil
+	} else if (strings.ToUpper(pair) == "ETHDAI") {
+		cmd := "/Users/nkunkel/Programming/Tools/setzer/bin/setzer"
+		args := []string{"gemini", "gdax", "kraken"}
+		prices := []float64{}
+		for _, arg := range args {
+			out, err := exec.Command(cmd, "price", arg).Output()
+			if err != nil {
+        		fmt.Printf("%s\n", err.Error())
+        		fmt.Printf("%s\n", string(out))
+        		continue
+    		}
+    		fmt.Printf("Cmd Returned: %s : %s", arg, string(out))
+    		price, err := strconv.ParseFloat(string(out[:len(out) - 2]), 64)
+    		if err != nil {
+    			fmt.Printf("%s", err.Error())
+    			continue
+    		}
+    		fmt.Printf("Parsing Returned: %s : %f\n", arg, price)
+    		prices = append(prices, price)
+    	}
+    	if (len(prices) == 0) {
+    		return 0, fmt.Errorf("No valid price sources\n")
+    	}
+    	median := getMedian(prices)
+    	fmt.Printf("Median Price = %f\n", median)
+    	return median, nil
 	}
-	return 0
+	return 0, fmt.Errorf("no valid price sources\n")
+}
+
+func getMedian(prices []float64) (float64) {
+	sum := 0.0
+	length := len(prices)
+	sort.Float64s(prices)
+	for _, price := range prices[1:(length - 1)] {
+		sum += price
+	}
+	return sum / float64(length - 2)
 }
 
 func getOrders() (*Orders) {
@@ -165,10 +202,6 @@ func getTotalOrderAmount(orders []*Order) (sum float64) {
 		sum += order.RemQuantity
 	}
 	return sum
-}
-
-func getFeedPrice(currency string) {
-	
 }
 
 //Updates the in-memory orderbook.
