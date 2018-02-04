@@ -116,9 +116,9 @@ func (bands *Bands) BandsOverlap() (bool) {
 }
 
 //Returns buy orders which need to be cancelled to bring total amount within all buy bands below maximum
-func (bands *Bands) ExcessiveBuyOrders(buyOrders []*Order, targetPrice float64) (cancellableBuyOrders []*Order){
+func (bands *Bands) ExcessiveBuyOrders(buyOrders []*Order, refPrice float64) (cancellableBuyOrders []*Order){
 	for _, buyBand := range bands.BuyBands {
-		for _, order := range buyBand.ExcessiveOrders(buyOrders, targetPrice) {
+		for _, order := range buyBand.ExcessiveOrders(buyOrders, refPrice) {
 			cancellableBuyOrders = append(cancellableBuyOrders, order)
 		}
 	}
@@ -126,9 +126,9 @@ func (bands *Bands) ExcessiveBuyOrders(buyOrders []*Order, targetPrice float64) 
 }
 
 //Return sell orders which need to be cancelled to bring total amount within all sell bands below maximum
-func (bands *Bands) ExcessiveSellOrders(sellOrders []*Order, targetPrice float64) (cancellableSellOrders []*Order) {
+func (bands *Bands) ExcessiveSellOrders(sellOrders []*Order, refPrice float64) (cancellableSellOrders []*Order) {
 	for _, sellBand := range bands.SellBands {
-		for _, order := range sellBand.ExcessiveOrders(sellOrders, targetPrice) {
+		for _, order := range sellBand.ExcessiveOrders(sellOrders, refPrice) {
 			cancellableSellOrders = append(cancellableSellOrders, order)
 		}
 	}
@@ -136,11 +136,11 @@ func (bands *Bands) ExcessiveSellOrders(sellOrders []*Order, targetPrice float64
 }
 
 //Returns orders which do not fall into any buy or sell band
-func (bands *Bands) OutsideOrders(buyOrders []*Order, sellOrders []*Order, targetPrice float64) (outsideOrders []*Order) {
+func (bands *Bands) OutsideOrders(buyOrders []*Order, sellOrders []*Order, refPrice float64) (outsideOrders []*Order) {
 	for _, buyOrder := range buyOrders {
 		inBand := false
 		for _, band := range bands.BuyBands {
-			if (band.Includes(buyOrder.Price, targetPrice)) {
+			if (band.Includes(buyOrder.Price, refPrice)) {
 				inBand = true
 			}
 		}
@@ -151,7 +151,7 @@ func (bands *Bands) OutsideOrders(buyOrders []*Order, sellOrders []*Order, targe
 	for _, sellOrder := range sellOrders {
 		inBand := false
 		for _, band := range bands.SellBands {
-			if (band.Includes(sellOrder.Price, targetPrice)) {
+			if (band.Includes(sellOrder.Price, refPrice)) {
 				inBand = true
 			}
 		}
@@ -162,10 +162,10 @@ func (bands *Bands) OutsideOrders(buyOrders []*Order, sellOrders []*Order, targe
 	return outsideOrders
 }
 
-func (bands *Bands) CancellableOrders(buyOrders []*Order, sellOrders []*Order, targetPrice float64) (ordersToCancel []*Order) {
-	ordersToCancel = append(ordersToCancel, bands.ExcessiveBuyOrders(buyOrders, targetPrice)...)
-	ordersToCancel = append(ordersToCancel, bands.ExcessiveSellOrders(sellOrders, targetPrice)...)
-	ordersToCancel = append(ordersToCancel, bands.OutsideOrders(buyOrders, sellOrders, targetPrice)...)
+func (bands *Bands) CancellableOrders(buyOrders []*Order, sellOrders []*Order, refPrice float64) (ordersToCancel []*Order) {
+	ordersToCancel = append(ordersToCancel, bands.ExcessiveBuyOrders(buyOrders, refPrice)...)
+	ordersToCancel = append(ordersToCancel, bands.ExcessiveSellOrders(sellOrders, refPrice)...)
+	ordersToCancel = append(ordersToCancel, bands.OutsideOrders(buyOrders, sellOrders, refPrice)...)
 	return ordersToCancel
 }
 
@@ -210,14 +210,14 @@ func (band *Band) VerifyBand() (error) {
 
 //Returns orders which need to be cancelled to bring the total
 //order amount in the band below the maximum
-func (band *Band) ExcessiveOrders(orders []*Order, targetPrice float64, bandType BandType) ([]*Order) {
+func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType BandType) ([]*Order) {
 	ordersInBand := []*Order{}
 	for _, order := range orders {
 		included := false
 		if t, ok := bandType.(BandType); ok {
-			included = t.Includes(order.Price, targetPrice)
+			included = t.Includes(order.Price, refPrice)
 		} else {
-			included = band.Includes(order.Price, targetPrice)
+			included = band.Includes(order.Price, refPrice)
 		}
 		if (included) {
 			ordersInBand = append(ordersInBand, order)
@@ -318,7 +318,7 @@ func (band *Band) CombinationUtil(input []*Order, output []*Order, start int, en
     }
 }
 
-func (band *Band) Includes(orderPrice float64, targetPrice float64) (bool) {
+func (band *Band) Includes(orderPrice float64, refPrice float64) (bool) {
 	//raise virtual method exception
 	fmt.Printf("Using Includes() from base class\n")
 	return true
@@ -349,25 +349,25 @@ type BuyBand struct {
 	Band
 }
 
-func (band *BuyBand) Includes(orderPrice float64, targetPrice float64) (bool) {
+func (band *BuyBand) Includes(orderPrice float64, refPrice float64) (bool) {
 	fmt.Printf("Using Includes() from BuyBand class\n")
 	fmt.Printf("BuyBand: MinMargin = %f, MaxMargin = %f, OrderPrice = %f\n", band.MinMargin, band.MaxMargin, orderPrice )
-	minPrice := band.ApplyMargin(targetPrice, band.MinMargin)
-	maxPrice := band.ApplyMargin(targetPrice, band.MaxMargin)
+	minPrice := band.ApplyMargin(refPrice, band.MinMargin)
+	maxPrice := band.ApplyMargin(refPrice, band.MaxMargin)
 	fmt.Printf("BuyBand: MinPrice = %f, MaxPrice = %f, OrderPrice = %f\n", minPrice, maxPrice, orderPrice)
 	return (orderPrice >= maxPrice) && (orderPrice <= minPrice)
 }
 
-func (band *BuyBand) AvgPrice(targetPrice float64) (float64) {
-	return band.ApplyMargin(targetPrice, band.AvgMargin)
+func (band *BuyBand) AvgPrice(refPrice float64) (float64) {
+	return band.ApplyMargin(refPrice, band.AvgMargin)
 }
 
 func (band *BuyBand) ApplyMargin(price float64, margin float64) (float64) {
 	return price * (1 - margin)
 }
 
-func (band *BuyBand) ExcessiveOrders(orders []*Order, targetPrice float64) ([]*Order) {
-	return band.Band.ExcessiveOrders(orders, targetPrice, band)
+func (band *BuyBand) ExcessiveOrders(orders []*Order, refPrice float64) ([]*Order) {
+	return band.Band.ExcessiveOrders(orders, refPrice, band)
 }
 
 ///////////////////////////////////
@@ -377,24 +377,24 @@ type SellBand struct {
 	Band
 }
 
-func (band *SellBand) Includes(orderPrice float64, targetPrice float64) (bool) {
+func (band *SellBand) Includes(orderPrice float64, refPrice float64) (bool) {
 	fmt.Printf("Using Includes() from SellBand class\n")
 	fmt.Printf("SellBand: MinMargin = %f, MaxMargin = %f, OrderPrice = %f\n", band.MinMargin, band.MaxMargin, orderPrice)
-	minPrice := band.ApplyMargin(targetPrice, band.MinMargin)
-	maxPrice := band.ApplyMargin(targetPrice, band.MaxMargin)
+	minPrice := band.ApplyMargin(refPrice, band.MinMargin)
+	maxPrice := band.ApplyMargin(refPrice, band.MaxMargin)
 	fmt.Printf("SellBand: MinPrice = %f, MaxPrice = %f, OrderPrice = %f\n", minPrice, maxPrice, orderPrice)
 	return (orderPrice >= minPrice) && (orderPrice <= maxPrice)
 }
 
 
-func (band *SellBand) AvgPrice(targetPrice float64) (float64) {
-	return band.ApplyMargin(targetPrice, band.AvgMargin)
+func (band *SellBand) AvgPrice(refPrice float64) (float64) {
+	return band.ApplyMargin(refPrice, band.AvgMargin)
 }
 
 func (band *SellBand) ApplyMargin(price float64, margin float64) (float64) {
 	return price * (1 + margin)
 }
 
-func (band *SellBand) ExcessiveOrders(orders []*Order, targetPrice float64) ([]*Order) {
-	return band.Band.ExcessiveOrders(orders, targetPrice, band)
+func (band *SellBand) ExcessiveOrders(orders []*Order, refPrice float64) ([]*Order) {
+	return band.Band.ExcessiveOrders(orders, refPrice, band)
 }

@@ -40,7 +40,7 @@ func main() {
 	//Execute market maker on interval
 	scheduler(func() {maker.MarketMaker(client, bands, PAIR)}, 5 * time.Second)
 
-	//TO DO - create real tests for these
+	//TO DO - create real test scripts for these
 	/*
 	//Test Public Queries
 	ticker, err := client.GetTickers()
@@ -128,10 +128,6 @@ func scheduler(what func(), delay time.Duration) {
 	    }
 	 }()
 	 <-quit
-}
-
-func ping(msg string) {
-	fmt.Printf ("%s\n", msg)
 }
 
 /*NOTES

@@ -44,78 +44,86 @@ func Test_Bands_ExcessiveSellOrders(t *testing.T) {
 //Test if bid on boundary of minMargin is in-band
 func Test_Bands_OutsideOrders1(t *testing.T) {
 	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
-	orders := []*Order{&Order{"DAIUSD", "BK01", 0, 0.997656, 50.0, 20.0, 1, "New", 0, 0, "1515755942"}}	//create in-band bid order
-	targetPrice := 1.00					//set ref price of asset to 1
-	assert.Empty(t, bands.OutsideOrders(orders, targetPrice))	//assert order is within boundary
+	bands.BuyBands = []BuyBand{BuyBand{Band{0.002344, 0.004689, 0.009378, 10.0, 40.0, 80.0, 0.0}}}
+	buyOrders := []*Order{&Order{"DAIUSD", "BK01", 0, 0.997656, 50.0, 20.0, 1, "New", 0, 0, "1515755942"}}	//create in-band bid order
+	sellOrders := []*Order{}
+	refPrice := 1.00					//set ref price of asset to 1
+	assert.Empty(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice))	//assert order is within boundary
 }
 
 //Test if bid on boundary of maxMargin is in-band
 func Test_Bands_OutsideOrders2(t *testing.T) {
 	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
-	orders := []*Order{&Order{"DAIUSD", "BK01", 0, 0.990622, 50.0, 20.0, 1, "New", 0, 0, "1515755942"}}	//create in-band bid order
-	targetPrice := 1.00					//set ref price of asset to 1
-	assert.Empty(t, bands.OutsideOrders(orders, targetPrice))					//assert order is within boundary
+	bands.BuyBands = []BuyBand{BuyBand{Band{0.002344, 0.004689, 0.009378, 10.0, 40.0, 80.0, 0.0}}}
+	buyOrders := []*Order{&Order{"DAIUSD", "BK01", 0, 0.990622, 50.0, 20.0, 1, "New", 0, 0, "1515755942"}}	//create in-band bid order
+	sellOrders := []*Order{}
+	refPrice := 1.00					//set ref price of asset to 1
+	assert.Empty(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice))	//assert order is within boundary
 }
 
 //Test if bid on minMargin++ is in-band
 func Test_Bands_OutsideOrders3(t *testing.T) {
 	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
-	orders := []*Order{&Order{"DAIUSD", "BK01", 0, 0.997657, 50.0, 20.0, 1, "New", 0, 0, "1515755942"}}	//create outside-band bid order
-	targetPrice := 1.00					//set ref price of asset to 1
-	assert.NotEmpty(t, bands.OutsideOrders(orders, targetPrice))				//assert order is out of bondary
-	assert.Contains(t, bands.OutsideOrders(orders, targetPrice), orders[0])		//assert order did not get corrupted
+	bands.BuyBands = []BuyBand{BuyBand{Band{0.002344, 0.004689, 0.009378, 10.0, 40.0, 80.0, 0.0}}}
+	buyOrders := []*Order{&Order{"DAIUSD", "BK01", 0, 0.997657, 50.0, 20.0, 1, "New", 0, 0, "1515755942"}}	//create outside-band bid order
+	sellOrders := []*Order{}
+	refPrice := 1.00					//set ref price of asset to 1
+	assert.NotEmpty(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice))				//assert order is out of bondary
+	assert.Contains(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice), buyOrders[0])	//assert order did not get corrupted
 }
 
 //Test if bid on maxMargin-- is in-band
 func Test_Bands_OutsideOrders4(t *testing.T) {
 	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
-	orders := []*Order{&Order{"DAIUSD", "BK01", 0, 0.990621, 50.0, 20.0, 1, "New", 0, 0, "1515755942"}}	//create outside-band bid order
-	targetPrice := 1.00					//set ref price of asset to 1
-	assert.NotEmpty(t, bands.OutsideOrders(orders, targetPrice))				//assert order is out of boundary
-	assert.Contains(t, bands.OutsideOrders(orders, targetPrice), orders[0])		//assert order did not get corrupted
+	bands.BuyBands = []BuyBand{BuyBand{Band{0.002344, 0.004689, 0.009378, 10.0, 40.0, 80.0, 0.0}}}
+	buyOrders := []*Order{&Order{"DAIUSD", "BK01", 0, 0.990621, 50.0, 20.0, 1, "New", 0, 0, "1515755942"}}	//create outside-band bid order
+	sellOrders := []*Order{}
+	refPrice := 1.00					//set ref price of asset to 1
+	assert.NotEmpty(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice))				//assert order is out of boundary
+	assert.Contains(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice), buyOrders[0])	//assert order did not get corrupted
 }
 
 
 //Test if ask on boundary of minMargin is in-band
 func Test_Bands_OutsideOrders5(t *testing.T) {
 	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
-	orders := []*Order{&Order{"DAIUSD", "BK01", 1, 1.000428, 50.0, 20.0, 1, "New", 0, 0, "1515755942"}}	//create bid order
-	targetPrice := 1.00					//set ref price of asset to 1
-	assert.Empty(t, bands.OutsideOrders(orders, targetPrice))					//assert order is within boundary
+	bands.SellBands = []SellBand{SellBand{Band{0.000428, 0.000856, 0.001711, 0.01, 0.1, 0.15, 0.0}}}
+	sellOrders := []*Order{&Order{"DAIUSD", "BK01", 1, 1.000428, 50.0, 20.0, 1, "New", 0, 0, "1515755942"}}	//create ask order
+	buyOrders := []*Order{}
+	refPrice := 1.00					//set ref price of asset to 1
+	assert.Empty(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice))		//assert order is within boundary
 }
 
 //Test if ask on boundary of maxMargin is in-band
 func Test_Bands_OutsideOrders6(t *testing.T) {
 	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
-	orders := []*Order{&Order{"DAIUSD", "BK02", 1, 1.001711, 10.0, 10.0, 1, "New", 0, 0, "1515755945"}}	//create bid order
-	targetPrice := 1.00					//set ref price of asset to 1
-	assert.Empty(t, bands.OutsideOrders(orders, targetPrice))					//assert order is within boundary
+	bands.SellBands = []SellBand{SellBand{Band{0.000428, 0.000856, 0.001711, 0.01, 0.1, 0.15, 0.0}}}
+	sellOrders := []*Order{&Order{"DAIUSD", "BK02", 1, 1.001711, 10.0, 10.0, 1, "New", 0, 0, "1515755945"}}	//create ask order
+	buyOrders := []*Order{}
+	refPrice := 1.00					//set ref price of asset to 1
+	assert.Empty(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice))		//assert order is within boundary
 }
 
 //Test if ask on minMargin-- is in-band
 func Test_Bands_OutsideOrders7(t *testing.T) {
 	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
-	orders := []*Order{&Order{"DAIUSD", "BK02", 1, 1.000427, 10.0, 10.0, 1, "New", 0, 0, "1515755945"}}	//create bid order
-	targetPrice := 1.00					//set ref price of asset to 1
-	assert.NotEmpty(t, bands.OutsideOrders(orders, targetPrice))				//assert order is out of boundary
-	assert.Contains(t, bands.OutsideOrders(orders, targetPrice), orders[0])		//assert order did not get corrupted
+	bands.SellBands = []SellBand{SellBand{Band{0.000428, 0.000856, 0.001711, 0.01, 0.1, 0.15, 0.0}}}
+	sellOrders := []*Order{&Order{"DAIUSD", "BK02", 1, 1.000427, 10.0, 10.0, 1, "New", 0, 0, "1515755945"}}	//create ask order
+	buyOrders := []*Order{}
+	refPrice := 1.00					//set ref price of asset to 1
+	assert.NotEmpty(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice))				//assert order is out of boundary
+	assert.Contains(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice), sellOrders[0])	//assert order did not get corrupted
 }
 
 //Test if ask on maxMargin++ is in-band
 func Test_Bands_OutsideOrders8(t *testing.T) {
 	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
-	orders := []*Order{&Order{"DAIUSD", "BK02", 1, 1.001712, 10.0, 10.0, 1, "New", 0, 0, "1515755945"}}	//create bid order
-	targetPrice := 1.00					//set ref price of asset to 1
-	assert.NotEmpty(t, bands.OutsideOrders(orders, targetPrice))				//assert order is out of boundary
-	assert.Contains(t, bands.OutsideOrders(orders, targetPrice), orders[0])		//assert order did not get corrupted
+	bands.SellBands = []SellBand{SellBand{Band{0.000428, 0.000856, 0.001711, 0.01, 0.1, 0.15, 0.0}}}
+	sellOrders := []*Order{&Order{"DAIUSD", "BK02", 1, 1.001712, 10.0, 10.0, 1, "New", 0, 0, "1515755945"}}	//create ask order
+	buyOrders := []*Order{}
+	refPrice := 1.00					//set ref price of asset to 1
+	assert.NotEmpty(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice))				//assert order is out of boundary
+	assert.Contains(t, bands.OutsideOrders(buyOrders, sellOrders, refPrice), sellOrders[0])	//assert order did not get corrupted
 }
 
 //BAND
