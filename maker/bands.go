@@ -116,51 +116,57 @@ func (bands *Bands) BandsOverlap() (bool) {
 }
 
 //Returns buy orders which need to be cancelled to bring total amount within all buy bands below maximum
-func (bands *Bands) ExcessiveBuyOrders(buyOrders []*Order, targetPrice float64) (killBuyOrders []*Order){
+func (bands *Bands) ExcessiveBuyOrders(buyOrders []*Order, targetPrice float64) (cancellableBuyOrders []*Order){
 	for _, buyBand := range bands.BuyBands {
 		for _, order := range buyBand.ExcessiveOrders(buyOrders, targetPrice) {
-			killBuyOrders = append(killBuyOrders, order)
+			cancellableBuyOrders = append(cancellableBuyOrders, order)
 		}
 	}
-	return killBuyOrders
+	return cancellableBuyOrders
 }
 
 //Return sell orders which need to be cancelled to bring total amount within all sell bands below maximum
-func (bands *Bands) ExcessiveSellOrders(sellOrders []*Order, targetPrice float64) (killSellOrders []*Order) {
+func (bands *Bands) ExcessiveSellOrders(sellOrders []*Order, targetPrice float64) (cancellableSellOrders []*Order) {
 	for _, sellBand := range bands.SellBands {
 		for _, order := range sellBand.ExcessiveOrders(sellOrders, targetPrice) {
-			killSellOrders = append(killSellOrders, order)
+			cancellableSellOrders = append(cancellableSellOrders, order)
 		}
 	}
-	return killSellOrders
+	return cancellableSellOrders
 }
 
 //Returns orders which do not fall into any buy or sell band
-func (bands *Bands) OutsideOrders(orders []*Order, targetPrice float64) (outsideOrders []*Order) {
-	for _, order := range orders {
-		if order.Side == 0 {
-			inBand := false
-			for _, band := range bands.BuyBands {
-				if (band.Includes(order.Price, targetPrice)) {
-					inBand = true
-				}
+func (bands *Bands) OutsideOrders(buyOrders []*Order, sellOrders []*Order, targetPrice float64) (outsideOrders []*Order) {
+	for _, buyOrder := range buyOrders {
+		inBand := false
+		for _, band := range bands.BuyBands {
+			if (band.Includes(buyOrder.Price, targetPrice)) {
+				inBand = true
 			}
-			if (!inBand) {
-				outsideOrders = append(outsideOrders, order)
+		}
+		if (!inBand) {
+			outsideOrders = append(outsideOrders, buyOrder)
+		}
+	}
+	for _, sellOrder := range sellOrders {
+		inBand := false
+		for _, band := range bands.SellBands {
+			if (band.Includes(sellOrder.Price, targetPrice)) {
+				inBand = true
 			}
-		} else if order.Side == 1 {
-			inBand := false
-			for _, band := range bands.SellBands {
-				if (band.Includes(order.Price, targetPrice)) {
-					inBand = true
-				}
-			}
-			if (!inBand) {
-				outsideOrders = append(outsideOrders, order)
-			}
+		}
+		if (!inBand) {
+			outsideOrders = append(outsideOrders, sellOrder)
 		}
 	}
 	return outsideOrders
+}
+
+func (bands *Bands) CancellableOrders(buyOrders []*Order, sellOrders []*Order, targetPrice float64) (ordersToCancel []*Order) {
+	ordersToCancel = append(ordersToCancel, bands.ExcessiveBuyOrders(buyOrders, targetPrice)...)
+	ordersToCancel = append(ordersToCancel, bands.ExcessiveSellOrders(sellOrders, targetPrice)...)
+	ordersToCancel = append(ordersToCancel, bands.OutsideOrders(buyOrders, sellOrders, targetPrice)...)
+	return ordersToCancel
 }
 
 ///////////////////////////////////
@@ -290,7 +296,6 @@ func (band *Band) GetAllCombinationsOfSizeN(input []*Order, comboSize int) {
 func (band *Band) CombinationUtil(input []*Order, output []*Order, start int, end int, index int, comboSize int) {
 	//Print Combo
 	if (index == comboSize) {
-		//You can put all your logic for checking combos here, don't even bother storing them.
 		total := band.TotalAmount(output)
 		if (total >= band.MinAmount && total < band.MaxAmount) {
 			temp := make([]*Order, comboSize)
@@ -320,7 +325,6 @@ func (band *Band) Includes(orderPrice float64, targetPrice float64) (bool) {
 }
 
 //Returns the total amount of all the orders
-//Warning - slice of orders passed must be exclusive bids or exclusively asks.
 func (band *Band) TotalAmount(orders []*Order) (total float64) {
 	for _, order := range orders {
 		total += order.RemQuantity

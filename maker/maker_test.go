@@ -54,3 +54,15 @@ func Test_Maker_GetMedian2(t *testing.T) {
 	median := getMedian(set)
 	assert.Equal(t, median, 150.0)
 }
+
+//marketMaker
+//cancelExcessOrders
+//topUpBands
+//topUpBuyBands
+//topUpSellBands
+//cancelAllOrders
+//getOrders
+//getBuyOrders
+//getSellOrders
+//getTotalOrderAmount
+//synchronizeOrders

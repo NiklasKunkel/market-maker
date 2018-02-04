@@ -3,11 +3,14 @@ package maker
 import (
 	"fmt"
 	"math"
+	"os"
 	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"github.com/niklaskunkel/market-maker/api"
+	"github.com/olekukonko/tablewriter"
 )
 
 
@@ -19,19 +22,73 @@ type Orders struct {
 	Bids 	map[string]Order
 }
 
-func topUpBands(gatecoin *api.GatecoinClient, bands Bands, targetPrice float64) {
+func MarketMaker(gatecoin *api.GatecoinClient, bands *Bands, pair string) {
 	//synchronize order book
 	err := synchronizeOrders(gatecoin)
 	if err != nil {
 		fmt.Printf(err.Error())
 		return
 	}
-	//create new buy and sell orders in all buy/sell bands
-	topUpBuyBands(gatecoin, getBuyOrders(), bands.BuyBands, targetPrice)
-	topUpSellBands(gatecoin, getSellOrders(), bands.SellBands, targetPrice)
+	//get reference price
+	refPrice, err := getFeedPrice(pair)
+	if err != nil {
+		return
+	}
+	cancelExcessOrders(gatecoin, bands.CancellableOrders(getBuyOrders(), getSellOrders(), refPrice))
+	topUpBands(gatecoin, bands, refPrice)
+	PrintOrderBook(gatecoin)
 }
 
-func topUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []BuyBand, targetPrice float64) {
+//Updates the in-memory orderbook.
+func synchronizeOrders(gatecoin *api.GatecoinClient) (error) {
+	fmt.Printf("synchronizing orderbook...\n")
+	resp, err := gatecoin.GetOrders()
+	if err != nil {
+		return fmt.Errorf("[GATECOIN] Failed to synchronize orders due to: %s\n", err.Error)
+	} else if (resp.Status.Message != "OK") {
+		return fmt.Errorf("[GATECOIN] Failed to synchronize orders due to: %+v\n", resp.Status)
+	}
+	//reset orderbook
+	orderBook.Asks = nil
+	orderBook.Bids = nil
+	orderBook.Asks = make(map[string]Order)
+	orderBook.Bids = make(map[string]Order)
+
+	//populate orderbook
+	fmt.Printf("Orderbook:\n")
+	for i, order := range resp.Orders {
+		if (order.Side == 0) {
+			fmt.Printf("Order #%d: Bid - OrderId = %s - Price = %f - Initial Quantity = %f - Remaining Quantity = %f - Timestamp = %s\n", i, order.OrderId, order.Price, order.InitQuantity, order.RemQuantity, order.Date)
+			orderBook.Bids[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
+		} else if (order.Side == 1) {
+			fmt.Printf("Order #%d: Ask - OrderId = %s - Price = %f - Initial Quantity = %f - Remaining Quantity = %f - Timestamp = %s\n", i, order.OrderId, order.Price, order.InitQuantity, order.RemQuantity, order.Date)
+			orderBook.Asks[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
+		}
+	}
+	return nil
+}
+
+func cancelExcessOrders(gatecoin *api.GatecoinClient, ordersToCancel []*Order) {
+	for _, order := range ordersToCancel {
+		resp, err := gatecoin.DeleteOrder(order.OrderId)
+		if err != nil {
+			fmt.Printf("Cancelling order %s failed due to: %s\n", order.OrderId, err.Error())
+		}
+		if resp.Status.ErrorCode != "" || resp.Status.Message != "OK" {
+			fmt.Printf("Cancelling order %s failed with error code: %s and message: %s\n", resp.Status.ErrorCode, resp.Status.Message)
+		} else {
+			fmt.Printf("[%s] Cancelled order %s: - Type: %d -  Price: %f - Initial Quantity: %f - Remaining Quantity: %f\n", time.Now().String(), order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, )
+		}
+	}
+}
+
+func topUpBands(gatecoin *api.GatecoinClient, bands *Bands, refPrice float64) {
+	//create new buy and sell orders in all buy/sell bands
+	topUpBuyBands(gatecoin, getBuyOrders(), bands.BuyBands, refPrice)
+	topUpSellBands(gatecoin, getSellOrders(), bands.SellBands, refPrice)
+}
+
+func topUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []BuyBand, refPrice float64) {
 	//get balance
  	availableBalances, err := gatecoin.GetBalances("USD")
  	if err != nil {
@@ -43,7 +100,7 @@ func topUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []Buy
  	for _, buyBand := range buyBands {
  		//get all buy orders in this band
  		for _, order := range orders {
- 			if buyBand.Includes(order.Price, targetPrice) {
+ 			if buyBand.Includes(order.Price, refPrice) {
  				buyOrders = append(buyOrders, order)
  			}
  		}
@@ -52,7 +109,7 @@ func topUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []Buy
  		//if total order amount is below minimum band threshold
  		if (totalAmount < buyBand.MinAmount) {
  			//get order parameters
- 			price := buyBand.AvgPrice(targetPrice)
+ 			price := buyBand.AvgPrice(refPrice)
  			payAmount := math.Min(buyBand.AvgAmount - totalAmount, availableUsdBalance)
  			buyAmount := payAmount / price
  			//verify order parameters
@@ -73,7 +130,7 @@ func topUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []Buy
  	return
 }
 
-func topUpSellBands(gatecoin *api.GatecoinClient, orders []*Order, sellBands []SellBand, targetPrice float64) {
+func topUpSellBands(gatecoin *api.GatecoinClient, orders []*Order, sellBands []SellBand, refPrice float64) {
 	availableBalances, err := gatecoin.GetBalances("DAI")
 	if err != nil {
 		fmt.Printf("[GATECOIN] Failed to get balances due to: %s\n", err.Error())
@@ -85,7 +142,7 @@ func topUpSellBands(gatecoin *api.GatecoinClient, orders []*Order, sellBands []S
  	for _, sellBand := range sellBands {
  		//get all buy orders in this band
  		for _, order := range orders {
- 			if sellBand.Includes(order.Price, targetPrice) {
+ 			if sellBand.Includes(order.Price, refPrice) {
  				sellOrders = append(sellOrders, order)
  			}
  		}
@@ -94,7 +151,7 @@ func topUpSellBands(gatecoin *api.GatecoinClient, orders []*Order, sellBands []S
  		//if total order amount is below minimum band threshold
  		if (totalAmount < sellBand.MinAmount) {
  			//get order parameters
- 			price := sellBand.AvgPrice(targetPrice)
+ 			price := sellBand.AvgPrice(refPrice)
  			payAmount := math.Min(sellBand.AvgAmount - totalAmount, availableDaiBalance)
  			buyAmount := payAmount / price
  			//verify order parameters
@@ -113,27 +170,6 @@ func topUpSellBands(gatecoin *api.GatecoinClient, orders []*Order, sellBands []S
  		sellOrders = nil
  	}
  	return
-}
-
-func cancelAllOrders(gatecoin *api.GatecoinClient) {
-	synchronizeOrders(gatecoin)
-	fmt.Printf("Cancelling all orders...\n")
-	for id, _ := range orderBook.Bids {
-		fmt.Printf("Cancelling Order %s...\n", id)
-		resp, err := gatecoin.DeleteOrder(id)
-		if err != nil {
-			fmt.Printf("Error: Failed to cancel order %s due to: %s\n", id, err.Error())
-		}
-		fmt.Printf("%s", resp.Status.Message)
-	}
-	for id, _ := range orderBook.Asks {
-		fmt.Printf("Cancelling Order %s...\n", id)
-		resp, err := gatecoin.DeleteOrder(id)
-		if err != nil {
-			fmt.Printf("Error: Failed to cancel order %s due to: %s\n", id, err.Error())
-		}
-		fmt.Printf("%s", resp.Status.Message)
-	}
 }
 
 func getFeedPrice(pair string) (float64, error) {
@@ -179,6 +215,27 @@ func getMedian(prices []float64) (float64) {
 	return sum / float64(length - 2)
 }
 
+func cancelAllOrders(gatecoin *api.GatecoinClient) {
+	synchronizeOrders(gatecoin)
+	fmt.Printf("Cancelling all orders...\n")
+	for id, _ := range orderBook.Bids {
+		fmt.Printf("Cancelling Order %s...\n", id)
+		resp, err := gatecoin.DeleteOrder(id)
+		if err != nil {
+			fmt.Printf("Error: Failed to cancel order %s due to: %s\n", id, err.Error())
+		}
+		fmt.Printf("%s", resp.Status.Message)
+	}
+	for id, _ := range orderBook.Asks {
+		fmt.Printf("Cancelling Order %s...\n", id)
+		resp, err := gatecoin.DeleteOrder(id)
+		if err != nil {
+			fmt.Printf("Error: Failed to cancel order %s due to: %s\n", id, err.Error())
+		}
+		fmt.Printf("%s", resp.Status.Message)
+	}
+}
+
 func getOrders() (*Orders) {
 	return orderBook
 }
@@ -204,38 +261,33 @@ func getTotalOrderAmount(orders []*Order) (sum float64) {
 	return sum
 }
 
-//Updates the in-memory orderbook.
-func synchronizeOrders(gatecoin *api.GatecoinClient) (error) {
-	fmt.Printf("synchronizing orderbook...\n")
-	resp, err := gatecoin.GetOrders()
+func PrintOrderBook(gatecoin *api.GatecoinClient) (error) {
+	err := synchronizeOrders(gatecoin)
 	if err != nil {
-		return fmt.Errorf("[GATECOIN] Failed to synchronize orders due to: %s\n", err.Error)
-	} else if (resp.Status.Message != "OK") {
-		return fmt.Errorf("[GATECOIN] Failed to synchronize orders due to: %+v\n", resp.Status)
+		return err
 	}
-	//reset orderbook
-	orderBook.Asks = nil
-	orderBook.Bids = nil
-	orderBook.Asks = make(map[string]Order)
-	orderBook.Bids = make(map[string]Order)
-
-	//populate orderbook
-	fmt.Printf("Orderbook:\n")
-	for i, order := range resp.Orders {
-		if (order.Side == 0) {
-			fmt.Printf("Order #%d: Bid - OrderId = %s - Price = %f - Initial Quantity = %f - Remaining Quantity = %f - Timestamp = %s\n", i, order.OrderId, order.Price, order.InitQuantity, order.RemQuantity, order.Date)
-			orderBook.Bids[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
-		} else if (order.Side == 1) {
-			fmt.Printf("Order #%d: Ask - OrderId = %s - Price = %f - Initial Quantity = %f - Remaining Quantity = %f - Timestamp = %s\n", i, order.OrderId, order.Price, order.InitQuantity, order.RemQuantity, order.Date)
-			orderBook.Asks[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
-		}
+	data := [][]string{}
+	for _, order := range orderBook.Asks {
+		data = append(data, []string{"Ask", order.OrderId, strconv.FormatFloat(order.Price, 'f', 6, 64), strconv.FormatFloat(order.InitQuantity, 'f', 6, 64), strconv.FormatFloat(order.RemQuantity, 'f', 6, 64), order.Date})
 	}
+	for _, order := range orderBook.Bids {
+		data = append(data, []string{"Bid", order.OrderId, strconv.FormatFloat(order.Price, 'f', 6, 64), strconv.FormatFloat(order.InitQuantity, 'f', 6, 64), strconv.FormatFloat(order.RemQuantity, 'f', 6, 64), order.Date})
+	}
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Order Type", "Order ID", "Price", "Initial Quantity", "Remaining Quantity", "Timestamp"})
+	table.SetHeaderColor(
+		tablewriter.Colors{tablewriter.Bold},
+		tablewriter.Colors{tablewriter.Bold},
+		tablewriter.Colors{tablewriter.Bold},
+		tablewriter.Colors{tablewriter.Bold},
+		tablewriter.Colors{tablewriter.Bold},
+		tablewriter.Colors{tablewriter.Bold})
+	table.AppendBulk(data)
+	table.Render()
 	return nil
 }
 
-//NOTES
-//Keep track of all actions in a log - order made - order cancelled
-	//These should be in easy to follow format, probably JSON of GetOrder(id)
-	//JSON format would help for parsing to create analytics later
-//maybe dont have orderbook be a global and just have it be initialized in tupUpBands() and then passed to synchronizeOrders and topUpBuyBands and topUpSellBands
-//in excesside orders or in includes need to add a check for order.Side, otherwise you will have bids which get inbcluded in sell band orders because of their price.
+func PrintAmountSold(gatecoin *api.GatecoinClient) (error) {
+	//TODO
+	return nil
+}
