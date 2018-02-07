@@ -4,7 +4,7 @@ import(
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"path/filepath"
 	"time"
 	"github.com/niklaskunkel/market-maker/api"
@@ -14,6 +14,14 @@ import(
 func main() {
 	//Pair to Trade
 	PAIR := "ETHDAI"
+
+	//Setup Logging
+	/*
+	Formatter := new(log.TextFormatter)
+	Formater.Timestamp = "02-01-2006 15:04:05"
+	Formatter.FullTimestamp = true
+	*/
+	log.SetFormatter(&log.JSONFormatter{})
 
 	//Load Credentials
 	CREDENTIALS := new(auth)
@@ -26,14 +34,14 @@ func main() {
 	bands := new(maker.Bands)
 	err := bands.LoadBands()
 	if err != nil {
-		fmt.Printf("Error loading bands: %s\n", err.Error())
+		log.Fatal("Error loading bands: %s", err.Error())
 	}
 	//Print Bands
 	bands.PrintBands()
 	//Verify Bands
 	err = bands.VerifyBands()
 	if err != nil {
-		fmt.Printf(err.Error())
+		log.Fatal(err.Error())
 		return
 	}
 
@@ -102,13 +110,12 @@ func ReadConfig(credentials *auth) {
 	absPath, _ := filepath.Abs("./src/github.com/niklaskunkel/market-maker/config.json")
 	raw, err := ioutil.ReadFile(absPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Unable to read config file due to: %s", err.Error())
 	}
 	err = json.Unmarshal(raw, credentials)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Unable to parse config file JSON due to: %s", err.Error())
 	}
-	fmt.Printf("api key = %s\napi secret = %s\n", credentials.Key, credentials.Secret)
 	return
 }
 
