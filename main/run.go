@@ -1,12 +1,10 @@
 package main 
 
 import(
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"time"
 	"github.com/niklaskunkel/market-maker/api"
+	"github.com/niklaskunkel/market-maker/config"
 	"github.com/niklaskunkel/market-maker/logger"
 	"github.com/niklaskunkel/market-maker/maker"
 	"github.com/sirupsen/logrus"
@@ -14,44 +12,6 @@ import(
 
 //Globals
 var log *logrus.Logger
-
-//Structs
-type auth struct {
-	Key		string	`json:"apiKey"`
-	Secret	string 	`json:"apiSecret"`
-}
-
-type config struct {
-	LogPath		string 	`json:"logPath"`
-	SetzerPath	string 	`json:"setzerPath"`
-}
-
-func LoadConfig(config *config) {
-	LoadFile(config, "config.json")
-	return
-}
-
-func LoadCredentials(credentials *auth) {
-	LoadFile(credentials, "credentials.json")
-	return
-}
-
-func LoadFile(filetype interface{}, filename string) {
-	goPath, ok := os.LookupEnv("GOPATH")
-	if ok != true {
-		log.WithFields(logrus.Fields{"function": "LoadFile"}).Fatal("$GOPATH Env Variable not set")
-	}
-	filePath := goPath + "/src/github.com/niklaskunkel/market-maker/" + filename
-	raw, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		log.WithFields(logrus.Fields{"function": "LoadFile", "path": filePath, "error": err.Error()}).Fatal("Unable to read file")
-	}
-	err = json.Unmarshal(raw, filetype)
-	if err != nil {
-		log.WithFields(logrus.Fields{"function": "LoadFile", "file": filename, "json": raw, "error": err.Error()}).Fatal("Unable to parse JSON")
-	}
-	return
-}
 
 func scheduler(what func(), delay time.Duration) {
 	fmt.Printf("Starting scheduled process on interval %d\n", delay)
@@ -79,25 +39,25 @@ func main() {
 	log = logger.InitLogger()
 
 	//Load Config
-	CONFIG := new(config)
-	LoadConfig(CONFIG)
+	CONFIG := new(config.Config)
+	config.LoadConfig(CONFIG)
 
 	//Load Credentials
-	CREDENTIALS := new(auth)
-	LoadCredentials(CREDENTIALS)
+	CREDENTIALS := new(config.Auth)
+	config.LoadCredentials(CREDENTIALS)
 
 	//Load Bands
 	bands := new(maker.Bands)
 	if(!bands.LoadBands()) {
 		return
 	}
-	
+
 	//Create Gatecoin API Client
 	client := api.NewGatecoinClient(CREDENTIALS.Key, CREDENTIALS.Secret)
 	
 
 	//Execute market maker on interval
-	scheduler(func() {maker.MarketMaker(client, bands, PAIR)}, 5 * time.Second)
+	scheduler(func() {maker.MarketMaker(client, bands, CONFIG, PAIR)}, 5 * time.Second)
 
 	/*
 	//TO DO - create real test scripts for these

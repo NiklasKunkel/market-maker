@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"github.com/niklaskunkel/market-maker/api"
+	"github.com/niklaskunkel/market-maker/config"
 	"github.com/niklaskunkel/market-maker/logger"
 	"github.com/olekukonko/tablewriter"
 	"github.com/sirupsen/logrus"
@@ -23,26 +24,26 @@ type Orders struct {
 	Bids 	map[string]Order
 }
 
-func MarketMaker(gatecoin *api.GatecoinClient, bands *Bands, pair string) {
+func MarketMaker(gatecoin *api.GatecoinClient, bands *Bands, CONFIG *config.Config, pair string) {
 	//synchronize order book
-	err := synchronizeOrders(gatecoin)
+	err := SynchronizeOrders(gatecoin)
 	if err != nil {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "error": err.Error()}).Error("Failed to synchronize Orders")
 		return
 	}
 	//get reference price
-	refPrice, err := getFeedPrice(pair)
+	refPrice, err := GetFeedPrice(pair, CONFIG)
 	if err != nil {
 		log.WithFields(logrus.Fields{"pair": pair, "error": err.Error()}).Error("Failed to get feed price")
 		return
 	}
-	cancelExcessOrders(gatecoin, bands.CancellableOrders(getBuyOrders(), getSellOrders(), refPrice))
-	topUpBands(gatecoin, bands, refPrice)
+	CancelExcessOrders(gatecoin, bands.CancellableOrders(GetBuyOrders(), GetSellOrders(), refPrice))
+	TopUpBands(gatecoin, bands, refPrice)
 	PrintOrderBook(gatecoin)
 }
 
 //Updates the in-memory orderbook.
-func synchronizeOrders(gatecoin *api.GatecoinClient) (error) {
+func SynchronizeOrders(gatecoin *api.GatecoinClient) (error) {
 	fmt.Printf("synchronizing orderbook...\n")
 	resp, err := gatecoin.GetOrders()
 	if err != nil {
@@ -72,7 +73,7 @@ func synchronizeOrders(gatecoin *api.GatecoinClient) (error) {
 	return nil
 }
 
-func cancelExcessOrders(gatecoin *api.GatecoinClient, ordersToCancel []*Order) {
+func CancelExcessOrders(gatecoin *api.GatecoinClient, ordersToCancel []*Order) {
 	for _, order := range ordersToCancel {
 		resp, err := gatecoin.DeleteOrder(order.OrderId)
 		if err != nil {
@@ -86,13 +87,13 @@ func cancelExcessOrders(gatecoin *api.GatecoinClient, ordersToCancel []*Order) {
 	}
 }
 
-func topUpBands(gatecoin *api.GatecoinClient, bands *Bands, refPrice float64) {
+func TopUpBands(gatecoin *api.GatecoinClient, bands *Bands, refPrice float64) {
 	//create new buy and sell orders in all buy/sell bands
-	topUpBuyBands(gatecoin, getBuyOrders(), bands.BuyBands, refPrice)
-	topUpSellBands(gatecoin, getSellOrders(), bands.SellBands, refPrice)
+	TopUpBuyBands(gatecoin, GetBuyOrders(), bands.BuyBands, refPrice)
+	TopUpSellBands(gatecoin, GetSellOrders(), bands.SellBands, refPrice)
 }
 
-func topUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []BuyBand, refPrice float64) {
+func TopUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []BuyBand, refPrice float64) {
 	//get balance
  	availableBalances, err := gatecoin.GetBalances("USD")
  	if err != nil {
@@ -137,7 +138,7 @@ func topUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []Buy
  	return
 }
 
-func topUpSellBands(gatecoin *api.GatecoinClient, orders []*Order, sellBands []SellBand, refPrice float64) {
+func TopUpSellBands(gatecoin *api.GatecoinClient, orders []*Order, sellBands []SellBand, refPrice float64) {
 	availableBalances, err := gatecoin.GetBalances("DAI")
 	if err != nil {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "topUpBuyBands", "error": err.Error()}).Error("Failed to get balances")
@@ -183,40 +184,40 @@ func topUpSellBands(gatecoin *api.GatecoinClient, orders []*Order, sellBands []S
  	return
 }
 
-func getFeedPrice(pair string) (float64, error) {
+func GetFeedPrice(pair string, config *config.Config) (float64, error) {
 	if (strings.ToUpper(pair) == "DAIUSD") {
 		return 1.00, nil
 	} else if (strings.ToUpper(pair) == "ETHDAI") {
-		cmd := "/Users/nkunkel/Programming/Tools/setzer/bin/setzer"
+		cmd := config.SetzerPath
 		exchanges := []string{"gemini", "gdax", "kraken"}
 		prices := []float64{}
 		for _, exchange := range exchanges {
 			out, err := exec.Command(cmd, "price", exchange).Output()
 			if err != nil {
-				log.WithFields(logrus.Fields{"function": "getFeedPrice", "exchange": exchange, "pair": pair, "error": err.Error(), "output": string(out)}).Error("Setzer failed to fetch price")
+				log.WithFields(logrus.Fields{"function": "GetFeedPrice", "exchange": exchange, "pair": pair, "error": err.Error(), "output": string(out)}).Error("Setzer failed to fetch price")
         		continue
     		}
-    		log.WithFields(logrus.Fields{"function": "getFeedPrice", "exchange": exchange, "pair": pair, "price": string(out)}).Debug("Setzer price fetch returned price")
+    		log.WithFields(logrus.Fields{"function": "GetFeedPrice", "exchange": exchange, "pair": pair, "price": string(out)}).Debug("Setzer price fetch returned price")
     		price, err := strconv.ParseFloat(string(out[:len(out) - 2]), 64)
     		if err != nil {
-    			log.WithFields(logrus.Fields{"function": "getFeedPrice", "exchange": exchange, "pair": pair, "price": string(out), "error": err.Error()}).Error("Failed to parse price from string to float")
+    			log.WithFields(logrus.Fields{"function": "GetFeedPrice", "exchange": exchange, "pair": pair, "price": string(out), "error": err.Error()}).Error("Failed to parse price from string to float")
     			continue
     		}
-    		log.WithFields(logrus.Fields{"function": "getFeedPrice", "exchange": exchange, "pair": pair, "unparsedPrice": string(out), "parsedPrice": price}).Debug("Parsing setzer price returned")
+    		log.WithFields(logrus.Fields{"function": "GetFeedPrice", "exchange": exchange, "pair": pair, "unparsedPrice": string(out), "parsedPrice": price}).Debug("Parsing setzer price returned")
     		prices = append(prices, price)
     	}
     	if (len(prices) == 0) {
-    		log.WithFields(logrus.Fields{"function": "getFeedPrice", "pair": pair}).Error("No valid price sources")
+    		log.WithFields(logrus.Fields{"function": "GetFeedPrice", "pair": pair}).Error("No valid price sources")
     		return 0, fmt.Errorf("No valid price sources")
     	}
-    	median := getMedian(prices)
-    	log.WithFields(logrus.Fields{"function": "getFeedPrice", "prices": prices, "median": median}).Debug("Median price of feed prices is...")
+    	median := GetMedian(prices)
+    	log.WithFields(logrus.Fields{"function": "GetFeedPrice", "prices": prices, "median": median}).Debug("Median price of feed prices is...")
     	return median, nil
 	}
 	return 0, fmt.Errorf("no valid price sources\n")
 }
 
-func getMedian(prices []float64) (float64) {
+func GetMedian(prices []float64) (float64) {
 	sum := 0.0
 	length := len(prices)
 	sort.Float64s(prices)
@@ -226,50 +227,50 @@ func getMedian(prices []float64) (float64) {
 	return sum / float64(length - 2)
 }
 
-func cancelAllOrders(gatecoin *api.GatecoinClient) {
-	synchronizeOrders(gatecoin)
+func CancelAllOrders(gatecoin *api.GatecoinClient) {
+	SynchronizeOrders(gatecoin)
 	log.WithFields(logrus.Fields{"client": "Gatecoin"}).Info("Cancelling all orders...")
 	for id, _ := range orderBook.Bids {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": id}).Info("Cancelling order...")
 		resp, err := gatecoin.DeleteOrder(id)
 		if err != nil {
-			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "cancelAllOrders", "orderId": id, "error": err.Error()}).Error("Failed to cancel order")
+			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "error": err.Error()}).Error("Failed to cancel order")
 		} else if resp.Status.Message != "OK" {
-			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "cancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to cancel order")
+			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to cancel order")
 		}
-		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "cancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Info("Cancelled Order")
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Info("Cancelled Order")
 	}
 	for id, _ := range orderBook.Asks {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": id}).Info("Cancelling order...")
 		resp, err := gatecoin.DeleteOrder(id)
 		if err != nil {
-			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "cancelAllOrders", "orderId": id, "error": err.Error()}).Error("Failed to cancel order")
+			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "error": err.Error()}).Error("Failed to cancel order")
 		} else if resp.Status.Message != "OK" {
-			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "cancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to cancel order")
+			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to cancel order")
 		}
-		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "cancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Info("Cancelled Order")
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Info("Cancelled Order")
 	}
 }
 
-func getOrders() (*Orders) {
+func GetOrders() (*Orders) {
 	return orderBook
 }
 
-func getBuyOrders() (bids []*Order) {
+func GetBuyOrders() (bids []*Order) {
 	for _, bid := range orderBook.Bids {
 		bids = append(bids, &bid)
 	}
 	return bids
 }
 
-func getSellOrders() (asks []*Order) {
+func GetSellOrders() (asks []*Order) {
 	for _, ask := range orderBook.Asks {
 		asks = append(asks, &ask)
 	}
 	return asks
 }
 
-func getTotalOrderAmount(orders []*Order) (sum float64) {
+func GetTotalOrderAmount(orders []*Order) (sum float64) {
 	for _, order := range orders {
 		sum += order.RemQuantity
 	}
@@ -277,7 +278,7 @@ func getTotalOrderAmount(orders []*Order) (sum float64) {
 }
 
 func PrintOrderBook(gatecoin *api.GatecoinClient) (error) {
-	err := synchronizeOrders(gatecoin)
+	err := SynchronizeOrders(gatecoin)
 	if err != nil {
 		return err
 	}

@@ -7,15 +7,11 @@ import(
 	"testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/niklaskunkel/market-maker/api"
+	"github.com/niklaskunkel/market-maker/config"
 )
 
-type auth struct {
-	Key		string	`json:"apiKey"`
-	Secret	string 	`json:"apiSecret"`
-}
-
-func setupGatecoinClient(t *testing.T) (*api.GatecoinClient) {
-	credentials := new(auth)
+func SetupGatecoinClient(t *testing.T) (*api.GatecoinClient) {
+	credentials := new(config.Auth)
 	goPath, ok := os.LookupEnv("GOPATH")
 	assert.True(t, ok)
 	credentialsPath := goPath + "/src/github.com/niklaskunkel/market-maker/credentials.json"
@@ -28,32 +24,36 @@ func setupGatecoinClient(t *testing.T) (*api.GatecoinClient) {
 }
 
 func Test_Maker_SynchronizeOrders(t  *testing.T) {
-	gatecoin := setupGatecoinClient(t)
-	err := synchronizeOrders(gatecoin)
+	gatecoin := SetupGatecoinClient(t)
+	err := SynchronizeOrders(gatecoin)
 	assert.Nil(t, err)
 }
 
 func Test_Maker_GetFeedPrice1(t *testing.T) {
-	refPrice, err := getFeedPrice("DAIUSD")
+	configuration := new(config.Config)
+	config.LoadConfig(configuration)
+	refPrice, err := GetFeedPrice("DAIUSD", configuration)
 	assert.Nil(t, err)
 	assert.Equal(t, refPrice, 1.0)
 }
 
 func Test_Maker_GetFeedPrice2(t *testing.T) {
-	refPrice, err := getFeedPrice("ETHDAI")
+	configuration := new(config.Config)
+	config.LoadConfig(configuration)
+	refPrice, err := GetFeedPrice("ETHDAI", configuration)
 	assert.Nil(t, err)
 	assert.NotZero(t, refPrice)
 }
 
 func Test_Maker_GetMedian1(t *testing.T) {
 	set := []float64{10.0, 100.0, 200.0, 500.0}
-	median := getMedian(set)
+	median := GetMedian(set)
 	assert.Equal(t, median, 150.0)
 }
 
 func Test_Maker_GetMedian2(t *testing.T) {
 	set := []float64{500.0, 10.0, 200.0, 100.0}
-	median := getMedian(set)
+	median := GetMedian(set)
 	assert.Equal(t, median, 150.0)
 }
 
