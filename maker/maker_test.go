@@ -3,7 +3,7 @@ package maker
 import(
 	"encoding/json"
 	"io/ioutil"
-	"path/filepath"
+	"os"
 	"testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/niklaskunkel/market-maker/api"
@@ -16,8 +16,10 @@ type auth struct {
 
 func setupGatecoinClient(t *testing.T) (*api.GatecoinClient) {
 	credentials := new(auth)
-	absPath, _ := filepath.Abs("/Users/nkunkel/Programming/Go/src/github.com/niklaskunkel/market-maker/config.json")
-	raw, err := ioutil.ReadFile(absPath)
+	goPath, ok := os.LookupEnv("GOPATH")
+	assert.True(t, ok)
+	credentialsPath := goPath + "/src/github.com/niklaskunkel/market-maker/credentials.json"
+	raw, err := ioutil.ReadFile(credentialsPath)
 	assert.Nil(t, err)
 	err = json.Unmarshal(raw, credentials)
 	assert.Nil(t, err)

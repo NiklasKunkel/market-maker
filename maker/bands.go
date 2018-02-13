@@ -4,7 +4,7 @@ import(
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
+	"os"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,10 +35,14 @@ type Order struct {
 
 //Load bands from bands.json file
 func (bands *Bands) LoadBands() (bool) {
-	absPath, _ := filepath.Abs("/Users/nkunkel/Programming/Go/src/github.com/niklaskunkel/market-maker/bands.json")
-	raw, err := ioutil.ReadFile(absPath)
+	goPath, ok := os.LookupEnv("GOPATH")
+	if ok != true {
+		log.WithFields(logrus.Fields{"function": "LoadBands"}).Fatal("$GOPATH Env Variable not set")
+	}
+	bandPath := goPath + "/src/github.com/niklaskunkel/market-maker/bands.json"
+	raw, err := ioutil.ReadFile(bandPath)
 	if err != nil {
-		log.WithFields(logrus.Fields{"function": "LoadBands", "error": err.Error()}).Error("Loading bands failed during ReadFile")
+		log.WithFields(logrus.Fields{"function": "LoadBands", "error": err.Error()}).Error("Unable to read bands.json")
 		return false
 	}
 	err = json.Unmarshal(raw, bands)

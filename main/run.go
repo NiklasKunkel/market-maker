@@ -4,7 +4,7 @@ import(
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
+	"os"
 	"time"
 	"github.com/niklaskunkel/market-maker/api"
 	"github.com/niklaskunkel/market-maker/logger"
@@ -12,7 +12,64 @@ import(
 	"github.com/sirupsen/logrus"
 )
 
+//Globals
 var log *logrus.Logger
+
+//Structs
+type auth struct {
+	Key		string	`json:"apiKey"`
+	Secret	string 	`json:"apiSecret"`
+}
+
+type config struct {
+	LogPath		string 	`json:"logPath"`
+	SetzerPath	string 	`json:"setzerPath"`
+}
+
+func LoadConfig(config *config) {
+	LoadFile(config, "config.json")
+	return
+}
+
+func LoadCredentials(credentials *auth) {
+	LoadFile(credentials, "credentials.json")
+	return
+}
+
+func LoadFile(filetype interface{}, filename string) {
+	goPath, ok := os.LookupEnv("GOPATH")
+	if ok != true {
+		log.WithFields(logrus.Fields{"function": "LoadFile"}).Fatal("$GOPATH Env Variable not set")
+	}
+	filePath := goPath + "/src/github.com/niklaskunkel/market-maker/" + filename
+	raw, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		log.WithFields(logrus.Fields{"function": "LoadFile", "path": filePath, "error": err.Error()}).Fatal("Unable to read file")
+	}
+	err = json.Unmarshal(raw, filetype)
+	if err != nil {
+		log.WithFields(logrus.Fields{"function": "LoadFile", "file": filename, "json": raw, "error": err.Error()}).Fatal("Unable to parse JSON")
+	}
+	return
+}
+
+func scheduler(what func(), delay time.Duration) {
+	fmt.Printf("Starting scheduled process on interval %d\n", delay)
+	ticker := time.NewTicker(delay)
+	quit := make(chan bool, 1)
+	go func() {
+		for {
+	       select {
+	        case <- ticker.C:
+	        	what()
+	        case <- quit:
+	            ticker.Stop()
+	            return
+	        }
+	    }
+	 }()
+	 <-quit
+}
 
 func main() {
 	//Pair to Trade
@@ -21,16 +78,20 @@ func main() {
 	//Initialize Logging
 	log = logger.InitLogger()
 
+	//Load Config
+	CONFIG := new(config)
+	LoadConfig(CONFIG)
+
 	//Load Credentials
 	CREDENTIALS := new(auth)
-	ReadConfig(CREDENTIALS)
+	LoadCredentials(CREDENTIALS)
 
 	//Load Bands
 	bands := new(maker.Bands)
 	if(!bands.LoadBands()) {
 		return
 	}
-
+	
 	//Create Gatecoin API Client
 	client := api.NewGatecoinClient(CREDENTIALS.Key, CREDENTIALS.Secret)
 	
@@ -88,42 +149,6 @@ func main() {
 	*/
 
 	return
-}
-
-type auth struct {
-	Key		string	`json:"apiKey"`
-	Secret	string 	`json:"apiSecret"`
-}
-
-func ReadConfig(credentials *auth) {
-	absPath, _ := filepath.Abs("./src/github.com/niklaskunkel/market-maker/config.json")
-	raw, err := ioutil.ReadFile(absPath)
-	if err != nil {
-		log.WithFields(logrus.Fields{"Error": err.Error()}).Fatal("Unable to read config file")
-	}
-	err = json.Unmarshal(raw, credentials)
-	if err != nil {
-		log.WithFields(logrus.Fields{"Error": err.Error()}).Fatal("Unable to parse config file JSON")
-	}
-	return
-}
-
-func scheduler(what func(), delay time.Duration) {
-	fmt.Printf("Starting scheduled process on interval %d\n", delay)
-	ticker := time.NewTicker(delay)
-	quit := make(chan bool, 1)
-	go func() {
-		for {
-	       select {
-	        case <- ticker.C:
-	        	what()
-	        case <- quit:
-	            ticker.Stop()
-	            return
-	        }
-	    }
-	 }()
-	 <-quit
 }
 
 /*TO DO:
