@@ -10,16 +10,21 @@ import(
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	//"reflect"
 	"strconv"
 	"strings"
 	"time"
+	"github.com/niklaskunkel/market-maker/logger"
+	"github.com/sirupsen/logrus"
 )
 
+//Constants
 const (
 	APIHostUrl = "https://api.gatecoin.com"
 	APIUserAgent = "MakerDAO Market-Maker"
 )
+
+//Globals
+var log = logger.InitLogger()
 
 var publicMethods = []string {
 	"LiveTickers",
@@ -33,6 +38,7 @@ var privateMethods = []string {
 	"ElectronicWallet/Withdrawals",
 }
 
+//Type Structs
 type GatecoinClient struct {
 	key 	string			//Gatecoin API Key
 	secret 	string			//Gatecoin Secret Key
@@ -51,7 +57,8 @@ func (gatecoin *GatecoinClient) queryPublic(params []string, typ interface{}) (i
 	//check if valid command
 	cmd := params[0]
 	if !IsStringInSlice(cmd, publicMethods) {
-		return nil, fmt.Errorf("[Gatecoin] (queryPublic) The method %s is not in the supported Public Methods list.", cmd)
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "queryPublic", "Command": cmd}).Error("Command is not in supported Public Commands list")
+		return nil, fmt.Errorf("Unsupported Public Method")
 	}
 	//format request URL w/ path and URL parameters
 	reqURL, _ := url.Parse(APIHostUrl)
@@ -70,7 +77,8 @@ func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string
 	cmd := params[0]
 	//check if valid command
 	if !IsStringInSlice(cmd, privateMethods) {
-		return nil, fmt.Errorf("[Gatecoin] (queryPrivate) The method %s is not in the supposed Private Methods list.", cmd)
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "queryPrivate", "Command": cmd}).Error("Command is not in supported Private Commands list")
+		return nil, fmt.Errorf("Unsupported Private Method.", cmd)
 	}
 
 	//Set url for request
@@ -108,11 +116,11 @@ func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string
 }
 
 func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, headers map[string]string, data []byte, responseType interface{}) (interface{}, error) {
-	//fmt.Printf("\nData = %s\n", data)
 	//Create request
 	req, err := http.NewRequest(requestType, reqURL.String(), bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("[Gatecoin] (doRequest) Could not execute request to %s (%s)", reqURL, err.Error())
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequest", "requestType": requestType, "requestURL": reqURL.String(), "data": data, "error": err.Error()}).Error("Failed to create new request")
+		return nil, err
 	}
 
 	//Add headers to request
@@ -124,44 +132,48 @@ func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, h
 		req.Header.Add(key, value)
 	}
 
-	//debug
-	//Print request prior to execution
-	fmt.Printf("\nREQUEST = %+v\n", req)
+	//Log copy of request to debug
+	log.WithFields(logrus.Fields{"client": "Gatecoin", "request": req}).Debug("Request being sent")
 
 	//Execute request
 	resp, err := gatecoin.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("[Gatecoin] (doRequest) Could not execute request to %s! (%s)", reqURL, err.Error())
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequest", "requestType": requestType, "requestURL": reqURL.String(), "data": data, "request": req, "error": err.Error()}).Error("Failed to execute request")
+		return nil, err
 	}
 	defer resp.Body.Close() 
 
 	//Read response
 	body, err := ioutil.ReadAll(resp.Body)
 
-	//debug
-	//Print response for request
-	fmt.Printf("\nRESPONSE = %s\n",body)
+	//Log copy of response to debug
+	log.WithFields(logrus.Fields{"client": "Gatecoin", "response": body}).Debug("Response received")
 
+	//Check if parsing response failed
 	if err != nil {
-		return nil, fmt.Errorf("[Gatecoin] (doRequest) Failed to parse response for query to %s! (%s)", reqURL, err.Error())
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequest", "body": resp.Body, "request": req, "error": err.Error()}).Error("Failed to parse response for query")
+		return nil, err
 	}
 
 	//Convert JSON to ErrorResponse struct to check if API returned error
 	apiError := ErrorResponse{}
 	err = json.Unmarshal(body, &apiError)
 	if err != nil {
-		return nil, fmt.Errorf("[Gatecoin] (doRequest) Failed to convert JSON response into error struct for query to %s! (%s)", reqURL, err.Error())
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequest", "body": body, "request": req, "error": err.Error()}).Error("Failed to convert JSON response into error struct")
+		return nil, err
 	}
 	if apiError.Status.Message != "OK" {
-		return nil, fmt.Errorf("Error => ErrorCode = %s, Message = %s\n", apiError.Status.ErrorCode, apiError.Status.Message)
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequest", "errorCode": apiError.Status.ErrorCode}).Error(apiError.Status.Message)
+		return nil, fmt.Errorf(apiError.Status.Message)
 	}
 
 	//Convert JSON to Response struct
 	err = json.Unmarshal(body, &responseType)
 	if err != nil {
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequestuest", "body": body, "request": req, "error": err.Error()}).Error("Failed to convert JSON response into struct")
+		return nil, err
 		return nil, fmt.Errorf("[Gatecoin] (doRequest) Failed to convert JSON response into struct for query to %s! (%s)", reqURL, err.Error())
 	}
-
 	return responseType, nil
 }
 /////////////////////////////////////////////////////////////////////////

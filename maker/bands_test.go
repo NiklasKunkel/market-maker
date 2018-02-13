@@ -8,7 +8,7 @@ import	(
 //BANDS
 func Test_Bands_LoadBands(t *testing.T) {
 	bands := new(Bands)					//create bands instance
-	assert.Nil(t, bands.LoadBands())	//load bands from bands.json
+	assert.True(t, bands.LoadBands())	//load bands from bands.json
 	assert.NotEmpty(t, bands.BuyBands)	//check buy bands exist
 	assert.NotEmpty(t, bands.SellBands)	//check sell bands exist
 }
@@ -16,7 +16,7 @@ func Test_Bands_LoadBands(t *testing.T) {
 func Test_Bands_VerifyBands(t *testing.T) {
 	bands := new(Bands)					//create bands instance
 	bands.LoadBands()					//load bands from bands.json
-	assert.Nil(t, bands.VerifyBands())	//verify if bands have correct paramters
+	assert.True(t, bands.VerifyBands())	//verify if bands have correct paramters
 }
 
 func Test_Bands_BandsOverlap1(t *testing.T) {

@@ -5,8 +5,10 @@ import(
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"github.com/sirupsen/logrus"
 )
 
+//Globals
 var validCombos = [][]*Order{}
 
 ///////////////////////////////////
@@ -18,7 +20,7 @@ type Bands struct {
 }
 
 type Order struct {
-	Code 			string 	
+	Code 			string
 	OrderId 		string
 	Side 			int64
 	Price 			float64
@@ -32,63 +34,58 @@ type Order struct {
 }
 
 //Load bands from bands.json file
-func (bands *Bands) LoadBands() (error) {
+func (bands *Bands) LoadBands() (bool) {
 	absPath, _ := filepath.Abs("/Users/nkunkel/Programming/Go/src/github.com/niklaskunkel/market-maker/bands.json")
 	raw, err := ioutil.ReadFile(absPath)
 	if err != nil {
-		return fmt.Errorf("Error: Band loading failed, %s\n", err.Error())
+		log.WithFields(logrus.Fields{"function": "LoadBands", "error": err.Error()}).Error("Loading bands failed during ReadFile")
+		return false
 	}
 	err = json.Unmarshal(raw, bands)
 	if err != nil {
-		return fmt.Errorf("Error: Band loading failed, %s\n", err.Error())
+		log.WithFields(logrus.Fields{"function": "LoadBands", "error": err.Error()}).Error("Loading bands failed during Unmarshal")
+		return false
 	}
-	for _, band := range bands.BuyBands  {
-		err = band.VerifyBand()
-		if err != nil {
-			return fmt.Errorf("%s\n", err.Error())
-		}
+	bands.PrintBands()
+	if (!bands.VerifyBands()) {
+		return false
 	}
-	for _, band :=  range bands.SellBands {
-		err = band.VerifyBand()
-		if err != nil {
-			return fmt.Errorf("%s\n", err.Error())
-		}
-	}
-	return nil
+	return true
 }
 
 //Print all bands
 func (bands *Bands) PrintBands() {
-	fmt.Printf("Buy Bands:\n")
+	log.Info("Buy Bands:")
 	for i, bBand := range bands.BuyBands {
-		fmt.Printf("#%d\n", i + 1)
-		bBand.PrintBand()
+		bBand.PrintBand(i)
 	}
-	fmt.Printf("Sell Bands:\n")
+	log.Info("Sell Bands:")
 	for i, sBand := range bands.SellBands {
-		fmt.Printf("#%d\n", i + 1)
-		sBand.PrintBand()
+		sBand.PrintBand(i)
 	}
 }
 
 //Verify band parameters
-func (bands *Bands) VerifyBands() (error) {
+func (bands *Bands) VerifyBands() (bool) {
 	for  _, bBand := range bands.BuyBands {
 		err := bBand.VerifyBand()
 		if err != nil {
-			return err
+			log.WithFields(logrus.Fields{"function": "VerifyBands", "band": bBand, "error": err.Error()}).Error("Buy band verification failed")
+			return false
 		}
 	}
 	for _, sBand := range bands.SellBands {
 		err := sBand.VerifyBand()
 		if err != nil {
-			return err
+			log.WithFields(logrus.Fields{"function": "VerifyBands", "band": sBand, "error": err.Error()}).Error("Sell band verification failed")
+			return false
 		}
 	}
 	if(bands.BandsOverlap()) {
-		return fmt.Errorf("Error during band verification: overlapping bands\n")
+		log.WithFields(logrus.Fields{"function": "VerifyBands"}).Error("Band verification failed due to overlapping bands")
+		return false
 	}
-	return nil
+	return true
 }
 
 func (bands *Bands) BandsOverlap() (bool) {
@@ -224,21 +221,21 @@ func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType Ba
 		}
 	}
 	//Debug
-	fmt.Printf("Orders Included:\n")
+	log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType}).Debug("Orders Included in Band:")
 	for _, orderInBand := range ordersInBand {
-		fmt.Printf("%f\n", orderInBand.RemQuantity)
+		log.WithFields(logrus.Fields{"orderId": orderInBand.OrderId, "RemQuantity": orderInBand.RemQuantity}).Debug("Order In Band")
 	}
 	if (band.TotalAmount(ordersInBand) > band.MaxAmount) {
-		fmt.Printf("Total Order Amount Exceeded, finding orders to cancel...\nAll Combinations:\n")
+		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType, "totalAmount": band.TotalAmount(ordersInBand), "maxAmount": band.MaxAmount}).Info("Total Order Amount Exceeded, finding orders to cancel...")
+		log.WithFields(logrus.Fields{}).Debug("All Combinations")
 		for size, _ := range ordersInBand {
 			band.GetAllCombinationsOfSizeN(ordersInBand, size + 1)
 		}
-		fmt.Printf("\nValid Combinations:\n")
+		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType}).Debug("Valid Combinations of Orders:")
 		for _, combo := range validCombos {
-			for _, element := range combo {
-				fmt.Printf("%f ", element.RemQuantity)
+			for i, element := range combo {
+				log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType, "comboNumber": i + 1, "orderId": element.OrderId, "price": element.Price, "remQuantity": element.RemQuantity}).Debug("order in valid combo")
 			}
-			fmt.Printf("\n")
 		}
 		//filter combos by largest length - this means we have to cancel less orders (saves gas for dex)
 		//if one or more combos share the largest length choose the one with the higher total amount
@@ -255,13 +252,9 @@ func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType Ba
 				maxLength = comboLength
 			}
 		}
-
-		//Debug - delete later
-		fmt.Printf("Max Length = %d\n", maxLength)
-		fmt.Printf("Max Index = %d\n", maxIndex)
-
+		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "numberOfOrdersInCombo": maxLength, "indexOfCombo": maxIndex}).Debug("Best combination of orders found")
+		//Kill all orders not in our best combination
 		ordersToKill := []*Order{}
-
 		for _, order := range ordersInBand {
 			keepOrder := false
 			for _, orderToKeep := range validCombos[maxIndex] {
@@ -273,13 +266,10 @@ func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType Ba
 				ordersToKill = append(ordersToKill, order)
 			}
 		}
-
 		//clear validCombos global
 		validCombos = nil
-
-		//Debug - delete later
 		for _, killOrder := range ordersToKill {
-			fmt.Printf("Kill Order: %+v\n", killOrder)
+			log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "orderId": killOrder.OrderId, "price": killOrder.Price, "remQuantity": killOrder.RemQuantity}).Debug("Order flagged for cancellation")
 		}
 		return ordersToKill
 	} else {
@@ -300,14 +290,11 @@ func (band *Band) CombinationUtil(input []*Order, output []*Order, start int, en
 		if (total >= band.MinAmount && total < band.MaxAmount) {
 			temp := make([]*Order, comboSize)
 			copy(temp, output)
-			fmt.Printf("Appending...")
 			validCombos = append(validCombos, temp)
 		}
-
-		for _, element := range output {
-			fmt.Printf("%f ", element.RemQuantity)
+		for i, element := range output {
+			log.WithFields(logrus.Fields{"function": "CombinationUtil", "comboSize": comboSize, "comboNumber": i + 1, "orderId": element.OrderId, "price": element.Price, "remQuantity": element.RemQuantity}).Debug("Order in possible combo")
 		}
-		fmt.Printf("\n")
 		return
 	}
 
@@ -320,7 +307,7 @@ func (band *Band) CombinationUtil(input []*Order, output []*Order, start int, en
 
 func (band *Band) Includes(orderPrice float64, refPrice float64) (bool) {
 	//raise virtual method exception
-	fmt.Printf("Using Includes() from base class\n")
+	log.WithFields(logrus.Fields{"function": "Includes", "band": band}).Fatal("Using base class Includes(), this should never happen!")
 	return true
 }
 
@@ -332,14 +319,8 @@ func (band *Band) TotalAmount(orders []*Order) (total float64) {
 	return total
 }
 
-func (band *Band) PrintBand() {
-	fmt.Printf("MinMargin = %f\n", band.MinMargin)
-	fmt.Printf("AvgMargin = %f\n", band.AvgMargin)
-	fmt.Printf("MaxMargin = %f\n", band.MaxMargin)
-	fmt.Printf("MinAmount = %f\n", band.MinAmount)
-	fmt.Printf("AvgAmount = %f\n", band.AvgAmount)
-	fmt.Printf("MaxAmount = %f\n", band.MaxAmount)
-	fmt.Printf("DustCutoff = %f\n\n", band.DustCutoff)
+func (band *Band) PrintBand(i int) {
+	log.WithFields(logrus.Fields{"BandNum": i + 1, "minMargin": band.MinMargin, "avgMargin": band.AvgMargin, "maxMargin": band.MaxMargin, "minAmount": band.MinMargin, "avgAmount": band.AvgAmount, "maxAmount": band.MaxAmount, "dustCutoff": band.DustCutoff}).Debug()
 }
 
 ///////////////////////////////////
@@ -350,12 +331,12 @@ type BuyBand struct {
 }
 
 func (band *BuyBand) Includes(orderPrice float64, refPrice float64) (bool) {
-	fmt.Printf("Using Includes() from BuyBand class\n")
-	fmt.Printf("BuyBand: MinMargin = %f, MaxMargin = %f, OrderPrice = %f\n", band.MinMargin, band.MaxMargin, orderPrice )
+	log.WithFields(logrus.Fields{"function": "Includes", "band": band}).Debug("Using Includes() from buy band")
 	minPrice := band.ApplyMargin(refPrice, band.MinMargin)
 	maxPrice := band.ApplyMargin(refPrice, band.MaxMargin)
-	fmt.Printf("BuyBand: MinPrice = %f, MaxPrice = %f, OrderPrice = %f\n", minPrice, maxPrice, orderPrice)
-	return (orderPrice >= maxPrice) && (orderPrice <= minPrice)
+	isIncluded := (orderPrice >= maxPrice) && (orderPrice <= minPrice)
+	log.WithFields(logrus.Fields{"function": "Includes", "bandType": "buy band", "minMargin": band.MinMargin, "maxMargin": band.MaxMargin, "minPrice": minPrice, "maxPrice": maxPrice, "orderPrice": orderPrice, "included": isIncluded}).Debug("Checking if order is in buy band...")
+	return isIncluded
 }
 
 func (band *BuyBand) AvgPrice(refPrice float64) (float64) {
@@ -378,14 +359,13 @@ type SellBand struct {
 }
 
 func (band *SellBand) Includes(orderPrice float64, refPrice float64) (bool) {
-	fmt.Printf("Using Includes() from SellBand class\n")
-	fmt.Printf("SellBand: MinMargin = %f, MaxMargin = %f, OrderPrice = %f\n", band.MinMargin, band.MaxMargin, orderPrice)
+	log.WithFields(logrus.Fields{"function": "Includes", "band": band}).Debug("Using Includes() from sell band")
 	minPrice := band.ApplyMargin(refPrice, band.MinMargin)
 	maxPrice := band.ApplyMargin(refPrice, band.MaxMargin)
-	fmt.Printf("SellBand: MinPrice = %f, MaxPrice = %f, OrderPrice = %f\n", minPrice, maxPrice, orderPrice)
-	return (orderPrice >= minPrice) && (orderPrice <= maxPrice)
+	isIncluded := (orderPrice >= minPrice) && (orderPrice <= maxPrice)
+	log.WithFields(logrus.Fields{"function": "Includes", "bandType": "sell band", "minMargin": band.MinMargin, "maxMargin": band.MaxMargin, "minPrice": minPrice, "maxPrice": maxPrice, "orderPrice": orderPrice, "included": isIncluded}).Debug("Checking if order is in sell band...")
+	return isIncluded
 }
-
 
 func (band *SellBand) AvgPrice(refPrice float64) (float64) {
 	return band.ApplyMargin(refPrice, band.AvgMargin)

@@ -4,58 +4,47 @@ import(
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	log "github.com/Sirupsen/logrus"
 	"path/filepath"
 	"time"
 	"github.com/niklaskunkel/market-maker/api"
+	"github.com/niklaskunkel/market-maker/logger"
 	"github.com/niklaskunkel/market-maker/maker"
+	"github.com/sirupsen/logrus"
 )
+
+var log *logrus.Logger
 
 func main() {
 	//Pair to Trade
 	PAIR := "ETHDAI"
 
-	//Setup Logging
-	/*
-	Formatter := new(log.TextFormatter)
-	Formater.Timestamp = "02-01-2006 15:04:05"
-	Formatter.FullTimestamp = true
-	*/
-	log.SetFormatter(&log.JSONFormatter{})
+	//Initialize Logging
+	log = logger.InitLogger()
 
 	//Load Credentials
 	CREDENTIALS := new(auth)
 	ReadConfig(CREDENTIALS)
 
+	//Load Bands
+	bands := new(maker.Bands)
+	if(!bands.LoadBands()) {
+		return
+	}
+
 	//Create Gatecoin API Client
 	client := api.NewGatecoinClient(CREDENTIALS.Key, CREDENTIALS.Secret)
 	
-	//Load Bands
-	bands := new(maker.Bands)
-	err := bands.LoadBands()
-	if err != nil {
-		log.Fatal("Error loading bands: %s", err.Error())
-	}
-	//Print Bands
-	bands.PrintBands()
-	//Verify Bands
-	err = bands.VerifyBands()
-	if err != nil {
-		log.Fatal(err.Error())
-		return
-	}
 
 	//Execute market maker on interval
 	scheduler(func() {maker.MarketMaker(client, bands, PAIR)}, 5 * time.Second)
 
-	//TO DO - create real test scripts for these
 	/*
+	//TO DO - create real test scripts for these
 	//Test Public Queries
 	ticker, err := client.GetTickers()
 	if err != nil {
-		fmt.Printf("%s", err.Error())
+		log.Error("%s", err.Error())
 	}
-	fmt.Printf("%+v", ticker)
 
 	marketDepth, err := client.GetMarketDepth("DAIUSD")
 	if err != nil {
@@ -110,11 +99,11 @@ func ReadConfig(credentials *auth) {
 	absPath, _ := filepath.Abs("./src/github.com/niklaskunkel/market-maker/config.json")
 	raw, err := ioutil.ReadFile(absPath)
 	if err != nil {
-		log.Fatal("Unable to read config file due to: %s", err.Error())
+		log.WithFields(logrus.Fields{"Error": err.Error()}).Fatal("Unable to read config file")
 	}
 	err = json.Unmarshal(raw, credentials)
 	if err != nil {
-		log.Fatal("Unable to parse config file JSON due to: %s", err.Error())
+		log.WithFields(logrus.Fields{"Error": err.Error()}).Fatal("Unable to parse config file JSON")
 	}
 	return
 }
@@ -137,17 +126,10 @@ func scheduler(what func(), delay time.Duration) {
 	 <-quit
 }
 
-/*NOTES
+/*TO DO:
 Create Analytics
-	timer on API calls so we can get average for latency and identify spikes, maybe use for dynamic adjusting frequency of scheduler later
-	internal tracking of order amounts sold and bought
-
-Split output into multiple logs
-	action log - track all actions and timestamp in a log - order made - order cancelled - timestamped
-		These should be in easy to follow format, probably JSON of GetOrder(id)
-		JSON format would help for parsing to create analytics later
-	raw logs - shows all raw printed output from intermediate function - useful for debugging production failures
-	analytics log - interim solution before creating database module for storing analytics
+	timer on API calls so we can get average for latency and identify spikes, maybe use for dynamic adjusting frequency of scheduler later since higher responsiveness to volatility is lower risk
+	
 		API latency
 		Daily Sold
 		Daily Bought
@@ -156,7 +138,7 @@ Split output into multiple logs
 		Net Bought
 		Net Profit
 
-Dont have orderbook be a global and just have it be initialized in tupUpBands() and then passed to synchronizeOrders and topUpBuyBands and topUpSellBands
+Dont have orderbook be a global and just have it be initialized in topUpBands() and then passed to synchronizeOrders and topUpBuyBands and topUpSellBands
 
 In excessiveOrders() or in includes() need to add a check for order.Side, otherwise you will have bids which get included in sell band orders because of their price.
 */

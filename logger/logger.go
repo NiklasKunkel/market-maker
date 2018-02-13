@@ -5,54 +5,52 @@ import(
 	"github.com/sirupsen/logrus"
 )
 
-//This still in early development and not in active use for logging yet.
-
 //Create logger
-var log *logrus.Logger
+var Log *logrus.Logger
 
 //Initialize Logging
 func InitLogger() (*logrus.Logger) {
-	if log != nil {
-		return log
+	if Log != nil {
+		return Log
 	}
 
-	log = logrus.New()
+	//initialize logger
+	Log = logrus.New()
 
 	//Create log routing depending on severity
 	pathMap := lfshook.PathMap{
-		logrus.DebugLevel: "/Users/nkunkel/Programming/Go/logs/debug.log",
 		logrus.InfoLevel:  "/Users/nkunkel/Programming/Go/logs/info.log",
 		logrus.ErrorLevel: "/Users/nkunkel/Programming/Go/logs/error.log",
+		logrus.FatalLevel: "/Users/nkunkel/Programming/Go/logs/error.log",
+		logrus.DebugLevel: "/Users/nkunkel/Programming/Go/logs/debug.log",
 	}
 
 	//Create formatter
-	formatter := new(logrus.TextFormatter)
+	formatter := &logrus.TextFormatter{
+		TimestampFormat: "02-01-2006 15:04:05",
+		FullTimestamp: true,
+	}
 
-	//Set Timestamp format
-	formatter.TimestampFormat = "02-01-2006 15:04:05"
-	formatter.FullTimestamp = true
+	//Create hook
+	hook := lfshook.NewHook(pathMap, formatter)
 
-	log.Hooks.Add(lfshook.NewHook(
-		pathMap,
-		formatter,
-	))
+	//Add hook
+	Log.AddHook(hook)
 
-	log.SetFormatter(formatter)
-	return log
+	//Set minimum threshold for logging to debug
+	Log.SetLevel(logrus.DebugLevel)
+
+	return Log
 }
 
 func Debug(args ...interface{}) {
+	Log.Debug(args...)
+}
 
+func Info(args ...interface{}) {
+	Log.Info(args...)
 }
 
 func Error(args ...interface{}) {
-
-}
-
-func Action(args ...interface{}) {
-
-}
-
-func Analytics(args ...interface{}) {
-
+	Log.Error(args...)
 }
