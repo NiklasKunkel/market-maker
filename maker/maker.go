@@ -48,21 +48,19 @@ func MarketMaker(gatecoin *api.GatecoinClient, CONFIG *config.Config) {
 	if(!allBands.LoadBands()) {
 		return
 	}
-
 	//synchronize order book
 	err := SynchronizeOrders(gatecoin)
 	if err != nil {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "error": err.Error()}).Error("Failed to synchronize Orders")
 		return
 	}
-
 	//iterate through active trading pairs
 	for _, tokenPair := range CONFIG.ActivePairs {
 		//get reference price
 		refPrice, err := GetFeedPrice(tokenPair, CONFIG)
 		if err != nil {
 			log.WithFields(logrus.Fields{"client": "Gatecoin", "pair": tokenPair, "error": err.Error()}).Error("Failed to get feed price")
-			return
+			continue
 		}
 		CancelExcessOrders(gatecoin, allBands[tokenPair].CancellableOrders(GetBuyOrders(tokenPair), GetSellOrders(tokenPair), refPrice))
 		TopUpBands(gatecoin, tokenPair, allBands[tokenPair], refPrice)
@@ -140,92 +138,114 @@ func TopUpBands(gatecoin *api.GatecoinClient, tokenPair string, bands Bands, ref
 }
 
 func TopUpBuyBands(gatecoin *api.GatecoinClient, tokenPair string, orders []*Order, buyBands []BuyBand, refPrice float64) {
-	//get balance
- 	availableBalances, err := gatecoin.GetBalances("USD")
+	//lookup token pair components
+	_, quote := registry.LookupTokenPair(tokenPair)
+	//get balance of quote token
+ 	availableBalances, err := gatecoin.GetBalances(quote)
  	if err != nil {
- 		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "topUpBuyBands", "error": err.Error()}).Error("Failed to get balances")
+ 		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "topUpBuyBands", "token": quote, "error": err.Error()}).Error("Failed to get balances")
+ 		return
 	}
-	availableUsdBalance := availableBalances.Balances[0].AvailableBalance
- 	buyOrders := []*Order{}
- 	//iterate through bandsb 
+	availableQuoteBalance := availableBalances.Balances[0].AvailableBalance
+ 	inBandBuyOrders := []*Order{}
+ 	//iterate through buy bands 
  	for _, buyBand := range buyBands {
- 		//get all buy orders in this band
+ 		//iterate through all buy orders for tokenPair
  		for _, order := range orders {
+ 			//check if buy order is included in band
  			if buyBand.Includes(order.Price, refPrice) {
- 				buyOrders = append(buyOrders, order)
+ 				//add to in-band buy order list
+ 				inBandBuyOrders = append(inBandBuyOrders, order)
  			}
  		}
- 		//get totalAmount of orders
- 		totalAmount := buyBand.TotalAmount(buyOrders)
+ 		//get total amount of all buy orders in band
+ 		totalAmount := buyBand.TotalAmount(inBandBuyOrders)
  		//if total order amount is below minimum band threshold
  		if (totalAmount < buyBand.MinAmount) {
  			//get order parameters
+ 			//price denominated in quote / base
  			price := buyBand.AvgPrice(refPrice)
- 			payAmount := math.Min(buyBand.AvgAmount - totalAmount, availableUsdBalance)
+ 			//amount to pay denominated in quote token
+ 			payAmount := math.Min(buyBand.AvgAmount - totalAmount, availableQuoteBalance)
+ 			//amount to buy denominated in base token
  			buyAmount := payAmount / price
  			//verify order parameters
  			if ((payAmount >= buyBand.DustCutoff) && (payAmount > float64(0)) && (buyAmount > float64(0))) {
- 				//Log order creation
- 				log.WithFields(logrus.Fields{"client": "Gatecoin", "pair": "DAIUSD", "amount": buyAmount, "price": price, "remainingBalance": availableUsdBalance - payAmount}).Info("Creating buy order...")
- 				//create order
- 				resp, err := gatecoin.CreateOrder("DAIUSD", "bid", strconv.FormatFloat(buyAmount, 'f', 6, 64), strconv.FormatFloat(price, 'f', 6, 64))	//not sure if this is payAmount or buyAmount
+ 				//lookup Gatecoin token pair syntax
+ 				gatecoinTokenPair := registry.LookupGatecoinTokenPair(tokenPair)
+ 				//log attempted order creation
+ 				log.WithFields(logrus.Fields{"client": "Gatecoin", "pair": gatecoinTokenPair, "amount": buyAmount, "price": price, "potentialRemainingQuoteBalance": availableQuoteBalance - payAmount}).Info("Creating buy order...")
+ 				//create order - amount denominated in base token
+ 				resp, err := gatecoin.CreateOrder(gatecoinTokenPair, "bid", strconv.FormatFloat(buyAmount, 'f', 6, 64), strconv.FormatFloat(price, 'f', 6, 64))
+ 				//check if order creation failed
  				if err != nil {
- 					log.WithFields(logrus.Fields{"client": "Gatecoin", "error": err.Error(), "pair": "DAIUSD", "amount": buyAmount, "price": price, "remainingBalance": availableUsdBalance - payAmount}).Error("Creating buy order failed")
+ 					log.WithFields(logrus.Fields{"client": "Gatecoin", "error": err.Error(), "pair": gatecoinTokenPair, "amount": buyAmount, "price": price, "potentialRemainingQuoteBalance": availableQuoteBalance - payAmount}).Error("Creating buy order failed")
  					continue
  				} else if resp.Status.Message != "OK" || resp.OrderId == "" {
- 					log.WithFields(logrus.Fields{"client": "Gatecoin", "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode, "pair": "DAIUSD", "amount": buyAmount, "price": price, "remainingBalance": availableUsdBalance - payAmount}).Error("Creating buy order failed")
+ 					log.WithFields(logrus.Fields{"client": "Gatecoin", "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode, "pair": gatecoinTokenPair, "amount": buyAmount, "price": price, "potentialRemainingBalance": availableQuoteBalance - payAmount}).Error("Creating buy order failed")
  					continue
  				}
- 				log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": resp.OrderId, "pair": "DAIUSD", "amount": buyAmount, "price": price, "remainingBalance": availableUsdBalance - payAmount}).Info("Created buy order")
+ 				//log successful order creation
+ 				log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": resp.OrderId, "pair": gatecoinTokenPair, "amount": buyAmount, "price": price, "remainingQuoteBalance": availableQuoteBalance - payAmount}).Info("Created buy order")
  			}
  		}
- 		buyOrders = nil
+ 		inBandBuyOrders = nil
  	}
  	return
 }
 
 func TopUpSellBands(gatecoin *api.GatecoinClient, tokenPair string, orders []*Order, sellBands []SellBand, refPrice float64) {
-	availableBalances, err := gatecoin.GetBalances("DAI")
+	//lookup token pair components
+	base, _ := registry.LookupTokenPair(tokenPair)
+	//get balance of base token
+	availableBalances, err := gatecoin.GetBalances(base)
 	if err != nil {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "topUpBuyBands", "error": err.Error()}).Error("Failed to get balances")
+		return
 	}
-	availableDaiBalance := availableBalances.Balances[0].AvailableBalance 
-
-	sellOrders := []*Order{}
- 	//iterate through bandsb 
+	availableBaseBalance := availableBalances.Balances[0].AvailableBalance 
+	inBandSellOrders := []*Order{}
+ 	//iterate through sell bands 
  	for _, sellBand := range sellBands {
- 		//get all buy orders in this band
+ 		//iterate through all sell orders
  		for _, order := range orders {
+ 			//check if sell order is included in band 
  			if sellBand.Includes(order.Price, refPrice) {
- 				sellOrders = append(sellOrders, order)
+ 				//add to in-band sell order list
+ 				inBandSellOrders = append(inBandSellOrders, order)
  			}
  		}
- 		//get totalAmount of orders
- 		totalAmount := sellBand.TotalAmount(sellOrders)
+ 		//get total amount of all sell orders in band
+ 		totalAmount := sellBand.TotalAmount(inBandSellOrders)
  		//if total order amount is below minimum band threshold
  		if (totalAmount < sellBand.MinAmount) {
  			//get order parameters
+ 			//price denominated in quote / base
  			price := sellBand.AvgPrice(refPrice)
- 			payAmount := math.Min(sellBand.AvgAmount - totalAmount, availableDaiBalance)
- 			buyAmount := payAmount / price
+ 			//amount to pay denominated in base token
+ 			payAmount := math.Min(sellBand.AvgAmount - totalAmount, availableBaseBalance)
+ 			//amount to buy denominated in quote token
+ 			buyAmount := payAmount * price
  			//verify order parameters
  			if ((payAmount >= sellBand.DustCutoff) && (payAmount > float64(0)) && (buyAmount > float64(0))) {
+ 				//lookup Gatecoin token pair syntax
+ 				gatecoinTokenPair := registry.LookupGatecoinTokenPair(tokenPair)
  				//Log order creation
- 				log.WithFields(logrus.Fields{"client": "Gatecoin", "pair": "DAIUSD", "amount": buyAmount, "price": price, "remainingBalance": availableDaiBalance - payAmount}).Info("Creating sell order...")
- 				//create order
- 				resp, err := gatecoin.CreateOrder("DAIUSD", "ask", strconv.FormatFloat(buyAmount, 'f', 6, 64), strconv.FormatFloat(price, 'f', 6, 64))	//not sure if this is payAmount or buyAmount
+ 				log.WithFields(logrus.Fields{"client": "Gatecoin", "pair": gatecoinTokenPair, "amount": buyAmount, "price": price, "potentialRemainingBalance": availableBaseBalance - payAmount}).Info("Creating sell order...")
+ 				//create order - amount denominated in base token
+ 				resp, err := gatecoin.CreateOrder(gatecoinTokenPair, "ask", strconv.FormatFloat(buyAmount, 'f', 6, 64), strconv.FormatFloat(price, 'f', 6, 64))
  				fmt.Printf("%+v\n", resp)
  				if err != nil {
- 					log.WithFields(logrus.Fields{"client": "Gatecoin", "error": err.Error(), "pair": "DAIUSD", "amount": buyAmount, "price": price, "remainingBalance": availableDaiBalance - payAmount}).Error("Creating sell order failed")
+ 					log.WithFields(logrus.Fields{"client": "Gatecoin", "error": err.Error(), "pair": gatecoinTokenPair, "amount": payAmount, "price": price, "potentialRemainingBalance": availableBaseBalance - payAmount}).Error("Creating sell order failed")
  					continue
  				} else if resp.Status.Message != "OK" || resp.OrderId == "" {
- 					log.WithFields(logrus.Fields{"client": "Gatecoin", "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode, "pair": "DAIUSD", "amount": buyAmount, "price": price, "remainingBalance": availableDaiBalance - payAmount}).Error("Creating buy order failed")
+ 					log.WithFields(logrus.Fields{"client": "Gatecoin", "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode, "pair": gatecoinTokenPair, "amount": buyAmount, "price": price, "potentialRemainingBalance": availableBaseBalance - payAmount}).Error("Creating buy order failed")
  					continue
  				}
- 				log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": resp.OrderId, "pair": "DAIUSD", "amount": buyAmount, "price": price, "remainingBalance": availableDaiBalance - payAmount}).Info("Created sell order")
+ 				log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": resp.OrderId, "pair": gatecoinTokenPair, "amount": buyAmount, "price": price, "remainingBalance": availableBaseBalance - payAmount}).Info("Created sell order")
  			}
  		}
- 		sellOrders = nil
+ 		inBandSellOrders = nil
  	}
  	return
 }
@@ -259,6 +279,10 @@ func GetFeedPrice(pair string, config *config.Config) (float64, error) {
     	median := GetMedian(prices)
     	log.WithFields(logrus.Fields{"function": "GetFeedPrice", "prices": prices, "median": median}).Debug("Median price of feed prices is...")
     	return median, nil
+	} else if (strings.ToUpper(pair) == "MKRBTC") {
+		return 0, fmt.Errorf("No valid price sources")
+	} else if (strings.ToUpper(pair) == "MKRETH") {
+		return 0, fmt.Errorf("No valid price sources")
 	}
 	return 0, fmt.Errorf("no valid price sources\n")
 }
