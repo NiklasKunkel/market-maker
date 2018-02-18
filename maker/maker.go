@@ -11,63 +11,102 @@ import (
 	"github.com/niklaskunkel/market-maker/api"
 	"github.com/niklaskunkel/market-maker/config"
 	"github.com/niklaskunkel/market-maker/logger"
+	"github.com/niklaskunkel/market-maker/registry"
 	"github.com/olekukonko/tablewriter"
 	"github.com/sirupsen/logrus"
 )
 
 //Globals
 var log = logger.InitLogger()
-var orderBook = new(Orders)
+var orderBook = make(OrderBook)
+
+type Order struct {
+	Code 			string
+	OrderId 		string
+	Side 			int64
+	Price 			float64
+	InitQuantity 	float64
+	RemQuantity 	float64
+	Status 			int64
+	StatusDesc 		string
+	TxSeqNo 		int64
+	Type 			int64
+	Date 			string
+}
 
 type Orders struct {
 	Asks	map[string]Order
 	Bids 	map[string]Order
-}
 
-func MarketMaker(gatecoin *api.GatecoinClient, bands *Bands, CONFIG *config.Config, pair string) {
+}
+type OrderBook map[string]map[string]*Orders
+
+
+func MarketMaker(gatecoin *api.GatecoinClient, CONFIG *config.Config) {
+	//load up Bands
+	allBands := make(AllBands)
+	if(!allBands.LoadBands()) {
+		return
+	}
+
 	//synchronize order book
 	err := SynchronizeOrders(gatecoin)
 	if err != nil {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "error": err.Error()}).Error("Failed to synchronize Orders")
 		return
 	}
-	//get reference price
-	refPrice, err := GetFeedPrice(pair, CONFIG)
-	if err != nil {
-		log.WithFields(logrus.Fields{"pair": pair, "error": err.Error()}).Error("Failed to get feed price")
-		return
+
+	//iterate through active trading pairs
+	for _, tokenPair := range CONFIG.ActivePairs {
+		//get reference price
+		refPrice, err := GetFeedPrice(tokenPair, CONFIG)
+		if err != nil {
+			log.WithFields(logrus.Fields{"client": "Gatecoin", "pair": tokenPair, "error": err.Error()}).Error("Failed to get feed price")
+			return
+		}
+		CancelExcessOrders(gatecoin, allBands[tokenPair].CancellableOrders(GetBuyOrders(tokenPair), GetSellOrders(tokenPair), refPrice))
+		TopUpBands(gatecoin, tokenPair, allBands[tokenPair], refPrice)
+		PrintOrderBook(gatecoin)
 	}
-	CancelExcessOrders(gatecoin, bands.CancellableOrders(GetBuyOrders(), GetSellOrders(), refPrice))
-	TopUpBands(gatecoin, bands, refPrice)
-	PrintOrderBook(gatecoin)
 }
 
 //Updates the in-memory orderbook.
 func SynchronizeOrders(gatecoin *api.GatecoinClient) (error) {
-	fmt.Printf("synchronizing orderbook...\n")
+	//reset NEW orderbook
+	for _, quoteMap := range orderBook {
+		for _, orderTypes := range quoteMap {
+			orderTypes.Asks = nil
+			orderTypes.Bids = nil
+			orderTypes.Asks = make(map[string]Order)
+			orderTypes.Bids = make(map[string]Order)
+		}
+	}
+
+	log.WithFields(logrus.Fields{"client": "Gatecoin"}).Info("Synchronizing orderbook...")
 	resp, err := gatecoin.GetOrders()
 	if err != nil {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "synchronizeOrders", "error": err.Error()}).Error("Failed to synchronize orders")
 		return err
 	} else if (resp.Status.Message != "OK") {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "synchronizeOrders", "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to synchronize orders")
-		return fmt.Errorf("Failed to synchronize orders due to status message")
+		return fmt.Errorf("Failed to synchronize orders due to invalid status message")
 	}
-	//reset orderbook
-	orderBook.Asks = nil
-	orderBook.Bids = nil
-	orderBook.Asks = make(map[string]Order)
-	orderBook.Bids = make(map[string]Order)
 
 	//populate orderbook
-	log.Debug("Orderbook:")
 	for i, order := range resp.Orders {
+		base, quote := registry.LookupTokenPair(order.Code)
+		if (orderBook[base] == nil) {
+			orderBook[base] = make(map[string]*Orders)
+		}
+		if (orderBook[base][quote].Bids == nil || orderBook[base][quote].Asks == nil) {
+			orderBook[base][quote] = &Orders{Asks: make(map[string]Order), Bids: make(map[string]Order)}
+		}
 		if (order.Side == 0) {
-			log.WithFields(logrus.Fields{"orderNum": i, "orderId": order.OrderId, "type": "bid", "price": order.Price, "initialQuantity": order.InitQuantity, "remainingQuantity": order.RemQuantity, "timestamp": order.Date}).Debug()
-			orderBook.Bids[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
+			log.WithFields(logrus.Fields{"orderNum": i, "pair": order.Code, "orderId": order.OrderId, "type": "bid", "price": order.Price, "initialQuantity": order.InitQuantity, "remainingQuantity": order.RemQuantity, "timestamp": order.Date}).Debug()
+			(orderBook[base])[quote].Bids[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
 		} else if (order.Side == 1) {
-			log.WithFields(logrus.Fields{"orderNum": i, "orderId": order.OrderId, "type": "ask", "price": order.Price, "initialQuantity": order.InitQuantity, "remainingQuantity": order.RemQuantity, "timestamp": order.Date}).Debug()
-			orderBook.Asks[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
+			log.WithFields(logrus.Fields{"orderNum": i, "pair": order.Code, "orderId": order.OrderId, "type": "ask", "price": order.Price, "initialQuantity": order.InitQuantity, "remainingQuantity": order.RemQuantity, "timestamp": order.Date}).Debug()
+			(orderBook[base])[quote].Asks[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
 		}
 	}
 	return nil
@@ -83,17 +122,24 @@ func CancelExcessOrders(gatecoin *api.GatecoinClient, ordersToCancel []*Order) {
 			log.WithFields(logrus.Fields{"function": "cancelExcessOrders", "orderId": order.OrderId, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Cancelling order failed")
 		} else {
 			log.WithFields(logrus.Fields{"orderId": order.OrderId, "type": order.Side, "price": order.Price, "initialQuantity": order.InitQuantity, "remainingQuantity": order.RemQuantity}).Info("Cancelled Order")
+			//remove order from internal orderbook
+			base, quote := registry.LookupTokenPair(order.Code)
+			if (order.Side == 0) {
+				delete(orderBook[base][quote].Bids, order.OrderId)
+			} else if (order.Side == 1) {
+				delete(orderBook[base][quote].Bids, order.OrderId) 
+			}
 		}
 	}
 }
 
-func TopUpBands(gatecoin *api.GatecoinClient, bands *Bands, refPrice float64) {
+func TopUpBands(gatecoin *api.GatecoinClient, tokenPair string, bands Bands, refPrice float64) {
 	//create new buy and sell orders in all buy/sell bands
-	TopUpBuyBands(gatecoin, GetBuyOrders(), bands.BuyBands, refPrice)
-	TopUpSellBands(gatecoin, GetSellOrders(), bands.SellBands, refPrice)
+	TopUpBuyBands(gatecoin, tokenPair, GetBuyOrders(tokenPair), bands.BuyBands, refPrice)
+	TopUpSellBands(gatecoin, tokenPair, GetSellOrders(tokenPair), bands.SellBands, refPrice)
 }
 
-func TopUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []BuyBand, refPrice float64) {
+func TopUpBuyBands(gatecoin *api.GatecoinClient, tokenPair string, orders []*Order, buyBands []BuyBand, refPrice float64) {
 	//get balance
  	availableBalances, err := gatecoin.GetBalances("USD")
  	if err != nil {
@@ -138,7 +184,7 @@ func TopUpBuyBands(gatecoin *api.GatecoinClient, orders []*Order, buyBands []Buy
  	return
 }
 
-func TopUpSellBands(gatecoin *api.GatecoinClient, orders []*Order, sellBands []SellBand, refPrice float64) {
+func TopUpSellBands(gatecoin *api.GatecoinClient, tokenPair string, orders []*Order, sellBands []SellBand, refPrice float64) {
 	availableBalances, err := gatecoin.GetBalances("DAI")
 	if err != nil {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "topUpBuyBands", "error": err.Error()}).Error("Failed to get balances")
@@ -230,41 +276,43 @@ func GetMedian(prices []float64) (float64) {
 func CancelAllOrders(gatecoin *api.GatecoinClient) {
 	SynchronizeOrders(gatecoin)
 	log.WithFields(logrus.Fields{"client": "Gatecoin"}).Info("Cancelling all orders...")
-	for id, _ := range orderBook.Bids {
-		log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": id}).Info("Cancelling order...")
-		resp, err := gatecoin.DeleteOrder(id)
-		if err != nil {
-			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "error": err.Error()}).Error("Failed to cancel order")
-		} else if resp.Status.Message != "OK" {
-			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to cancel order")
+	for _, quoteSet := range orderBook {
+		for _, orders := range quoteSet {
+			for id, _ := range orders.Bids {
+				log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": id}).Info("Cancelling order...")
+				resp, err := gatecoin.DeleteOrder(id)
+				if err != nil {
+					log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "error": err.Error()}).Error("Failed to cancel order")
+				} else if resp.Status.Message != "OK" {
+					log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to cancel order")
+				}
+				log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Info("Cancelled Order")
+			}
+			for id, _ := range orders.Asks {
+				log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": id}).Info("Cancelling order...")
+				resp, err := gatecoin.DeleteOrder(id)
+				if err != nil {
+					log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "error": err.Error()}).Error("Failed to cancel order")
+				} else if resp.Status.Message != "OK" {
+					log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to cancel order")
+				}
+				log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Info("Cancelled Order")
+			}
 		}
-		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Info("Cancelled Order")
-	}
-	for id, _ := range orderBook.Asks {
-		log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": id}).Info("Cancelling order...")
-		resp, err := gatecoin.DeleteOrder(id)
-		if err != nil {
-			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "error": err.Error()}).Error("Failed to cancel order")
-		} else if resp.Status.Message != "OK" {
-			log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to cancel order")
-		}
-		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Info("Cancelled Order")
 	}
 }
 
-func GetOrders() (*Orders) {
-	return orderBook
-}
-
-func GetBuyOrders() (bids []*Order) {
-	for _, bid := range orderBook.Bids {
+func GetBuyOrders(tokenPair string) (bids []*Order) {
+	base, quote := registry.LookupTokenPair(tokenPair)
+	for _, bid := range orderBook[base][quote].Bids {
 		bids = append(bids, &bid)
 	}
 	return bids
 }
 
-func GetSellOrders() (asks []*Order) {
-	for _, ask := range orderBook.Asks {
+func GetSellOrders(tokenPair string) (asks []*Order) {
+	base, quote := registry.LookupTokenPair(tokenPair)
+	for _, ask := range orderBook[base][quote].Asks {
 		asks = append(asks, &ask)
 	}
 	return asks
@@ -282,28 +330,28 @@ func PrintOrderBook(gatecoin *api.GatecoinClient) (error) {
 	if err != nil {
 		return err
 	}
-	data := [][]string{}
-	for _, order := range orderBook.Asks {
-		data = append(data, []string{"Ask", order.OrderId, strconv.FormatFloat(order.Price, 'f', 6, 64), strconv.FormatFloat(order.InitQuantity, 'f', 6, 64), strconv.FormatFloat(order.RemQuantity, 'f', 6, 64), order.Date})
+	for _, quoteSet := range orderBook {
+		for _, orders := range quoteSet {
+			data := [][]string{}
+			for _, order := range orders.Asks {
+				data = append(data, []string{order.Code, "Ask", order.OrderId, strconv.FormatFloat(order.Price, 'f', 6, 64), strconv.FormatFloat(order.InitQuantity, 'f', 6, 64), strconv.FormatFloat(order.RemQuantity, 'f', 6, 64), order.Date})
+			}
+			for _, order := range orders.Bids {
+				data = append(data, []string{order.Code, "Bid", order.OrderId, strconv.FormatFloat(order.Price, 'f', 6, 64), strconv.FormatFloat(order.InitQuantity, 'f', 6, 64), strconv.FormatFloat(order.RemQuantity, 'f', 6, 64), order.Date})
+			}
+			table := tablewriter.NewWriter(os.Stdout)
+			table.SetHeader([]string{"Pair", "Order Type", "Order ID", "Price", "Initial Quantity", "Remaining Quantity", "Timestamp"})
+			table.SetHeaderColor(
+				tablewriter.Colors{tablewriter.Bold},
+				tablewriter.Colors{tablewriter.Bold},
+				tablewriter.Colors{tablewriter.Bold},
+				tablewriter.Colors{tablewriter.Bold},
+				tablewriter.Colors{tablewriter.Bold},
+				tablewriter.Colors{tablewriter.Bold},
+				tablewriter.Colors{tablewriter.Bold})
+			table.AppendBulk(data)
+			table.Render()
+		} 
 	}
-	for _, order := range orderBook.Bids {
-		data = append(data, []string{"Bid", order.OrderId, strconv.FormatFloat(order.Price, 'f', 6, 64), strconv.FormatFloat(order.InitQuantity, 'f', 6, 64), strconv.FormatFloat(order.RemQuantity, 'f', 6, 64), order.Date})
-	}
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Order Type", "Order ID", "Price", "Initial Quantity", "Remaining Quantity", "Timestamp"})
-	table.SetHeaderColor(
-		tablewriter.Colors{tablewriter.Bold},
-		tablewriter.Colors{tablewriter.Bold},
-		tablewriter.Colors{tablewriter.Bold},
-		tablewriter.Colors{tablewriter.Bold},
-		tablewriter.Colors{tablewriter.Bold},
-		tablewriter.Colors{tablewriter.Bold})
-	table.AppendBulk(data)
-	table.Render()
-	return nil
-}
-
-func PrintAmountSold(gatecoin *api.GatecoinClient) (error) {
-	//TODO
 	return nil
 }

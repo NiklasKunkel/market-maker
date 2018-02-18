@@ -1,4 +1,4 @@
 {
-	"logPath": "/Users/nkunkel/Programming/Go/logs/",
+	"activePairs":["ETHDAI", "DAIUSD"],
 	"setzerPath": "/Users/nkunkel/Programming/Tools/setzer/bin/setzer"
 }

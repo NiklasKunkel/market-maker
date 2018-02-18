@@ -32,9 +32,6 @@ func scheduler(what func(), delay time.Duration) {
 }
 
 func main() {
-	//Pair to Trade
-	PAIR := "ETHDAI"
-
 	//Initialize Logging
 	log = logger.InitLogger()
 
@@ -47,17 +44,19 @@ func main() {
 	config.LoadCredentials(CREDENTIALS)
 
 	//Load Bands
-	bands := new(maker.Bands)
-	if(!bands.LoadBands()) {
-		return
-	}
+	//bands := new(maker.Bands)
+
+	//bands := make(maker.AllBands)
+	//if(!bands.LoadBands()) {
+	//	return
+	//}
 
 	//Create Gatecoin API Client
 	client := api.NewGatecoinClient(CREDENTIALS.Key, CREDENTIALS.Secret)
-	
 
 	//Execute market maker on interval
-	scheduler(func() {maker.MarketMaker(client, bands, CONFIG, PAIR)}, 5 * time.Second)
+	//scheduler(func() {maker.MarketMaker(client, bands, CONFIG)}, 5 * time.Second)
+	scheduler(func() {maker.MarketMaker(client, CONFIG)}, 5 * time.Second)
 
 	/*
 	//TO DO - create real test scripts for these

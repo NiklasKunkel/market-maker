@@ -17,8 +17,8 @@ type Auth struct {
 }
 
 type Config struct {
-	LogPath		string 	`json:"logPath"`
-	SetzerPath	string 	`json:"setzerPath"`
+	SetzerPath	string 		`json:"setzerPath"`
+	ActivePairs	[]string	`json:"ActivePairs"`
 }
 
 func LoadCredentials(credentials *Auth) {
@@ -28,6 +28,7 @@ func LoadCredentials(credentials *Auth) {
 
 func LoadConfig(config *Config) {
 	LoadFile(config, "config.json")
+	log.WithFields(logrus.Fields{"SetzerPath": config.SetzerPath, "ActivePairs": config.ActivePairs}).Info("Config Params")
 	return
 }
 

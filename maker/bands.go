@@ -10,60 +10,69 @@ import(
 
 //Globals
 var validCombos = [][]*Order{}
+//var allBands = make(AllBands)
 
 ///////////////////////////////////
 //         BANDS
 ///////////////////////////////////
+type AllBands map[string]Bands
 type Bands struct {
 	BuyBands 	[]BuyBand 	`json:"buyBands"`
 	SellBands 	[]SellBand 	`json:"sellBands"`
 }
 
-type Order struct {
-	Code 			string
-	OrderId 		string
-	Side 			int64
-	Price 			float64
-	InitQuantity 	float64
-	RemQuantity 	float64
-	Status 			int64
-	StatusDesc 		string
-	TxSeqNo 		int64
-	Type 			int64
-	Date 			string
-}
-
 //Load bands from bands.json file
-func (bands *Bands) LoadBands() (bool) {
+func (allBands AllBands) LoadBands() (bool) {
+	//clear existing bands
+	for _, bands := range allBands {
+		bands.BuyBands = nil
+		bands.SellBands = nil
+	}
+	//lookup $GOPATH
 	goPath, ok := os.LookupEnv("GOPATH")
 	if ok != true {
 		log.WithFields(logrus.Fields{"function": "LoadBands"}).Fatal("$GOPATH Env Variable not set")
 	}
+	//construct path to bands.json
 	bandPath := goPath + "/src/github.com/niklaskunkel/market-maker/bands.json"
+	//read bands.json
 	raw, err := ioutil.ReadFile(bandPath)
 	if err != nil {
-		log.WithFields(logrus.Fields{"function": "LoadBands", "error": err.Error()}).Error("Unable to read bands.json")
+		log.WithFields(logrus.Fields{"function": "LoadBands", "error": err.Error()}).Error("Unable to read bandsNew.json")
 		return false
 	}
-	err = json.Unmarshal(raw, bands)
+	//load json into memory
+	err = json.Unmarshal(raw, &allBands)
 	if err != nil {
-		log.WithFields(logrus.Fields{"function": "LoadBands", "error": err.Error()}).Error("Loading bands failed during Unmarshal")
+		log.WithFields(logrus.Fields{"function": "LoadBands", "error": err.Error()}).Error("Loading bandsNew failed during Unmarshal")
 		return false
 	}
-	bands.PrintBands()
-	if (!bands.VerifyBands()) {
-		return false
+	//print bands
+	allBands.PrintAllBands()
+
+	//verify bands
+	for _, bands := range allBands {
+		if(!bands.VerifyBands()) {
+			return false
+		}
 	}
 	return true
 }
 
-//Print all bands
+func (allBands AllBands) PrintAllBands() {
+	for tokenPair, bands := range allBands {
+		log.Debug(tokenPair + "Bands:")
+		bands.PrintBands()
+	}
+}
+
+//Print all bands of a specific token pair
 func (bands *Bands) PrintBands() {
-	log.Info("Buy Bands:")
+	log.Debug("Buy Bands:")
 	for i, bBand := range bands.BuyBands {
 		bBand.PrintBand(i)
 	}
-	log.Info("Sell Bands:")
+	log.Debug("Sell Bands:")
 	for i, sBand := range bands.SellBands {
 		sBand.PrintBand(i)
 	}
@@ -163,7 +172,7 @@ func (bands *Bands) OutsideOrders(buyOrders []*Order, sellOrders []*Order, refPr
 	return outsideOrders
 }
 
-func (bands *Bands) CancellableOrders(buyOrders []*Order, sellOrders []*Order, refPrice float64) (ordersToCancel []*Order) {
+func (bands Bands) CancellableOrders(buyOrders []*Order, sellOrders []*Order, refPrice float64) (ordersToCancel []*Order) {
 	ordersToCancel = append(ordersToCancel, bands.ExcessiveBuyOrders(buyOrders, refPrice)...)
 	ordersToCancel = append(ordersToCancel, bands.ExcessiveSellOrders(sellOrders, refPrice)...)
 	ordersToCancel = append(ordersToCancel, bands.OutsideOrders(buyOrders, sellOrders, refPrice)...)

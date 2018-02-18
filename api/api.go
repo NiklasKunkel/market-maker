@@ -147,7 +147,7 @@ func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, h
 	body, err := ioutil.ReadAll(resp.Body)
 
 	//Log copy of response to debug
-	log.WithFields(logrus.Fields{"client": "Gatecoin", "response": body}).Debug("Response received")
+	log.WithFields(logrus.Fields{"client": "Gatecoin", "response": string(body)}).Debug("Response received")
 
 	//Check if parsing response failed
 	if err != nil {
