@@ -5,6 +5,7 @@ import(
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 	"github.com/stretchr/testify/assert"
 	"github.com/niklaskunkel/market-maker/api"
 	"github.com/niklaskunkel/market-maker/config"
@@ -23,9 +24,18 @@ func SetupGatecoinClient(t *testing.T) (*api.GatecoinClient) {
 	return client
 }
 
-func Test_Maker_SynchronizeOrders(t  *testing.T) {
+func Test_Maker_SynchronizeOrders1(t  *testing.T) {
 	gatecoin := SetupGatecoinClient(t)
 	err := SynchronizeOrders(gatecoin)
+	assert.Nil(t, err)
+}
+
+func Test_Maker_SynchronizeOrders2(t *testing.T) {
+	gatecoin := SetupGatecoinClient(t)
+	err := SynchronizeOrders(gatecoin)
+	assert.Nil(t, err)
+	time.Sleep(1000 * time.Millisecond)
+	err = SynchronizeOrders(gatecoin)
 	assert.Nil(t, err)
 }
 

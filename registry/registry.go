@@ -1,8 +1,8 @@
 package registry
 
 type TokenPair struct {
-	BaseToken string
-	QuoteToken string
+	BaseToken 	string
+	QuoteToken 	string
 }
 
 type ExchangeList struct {

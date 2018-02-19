@@ -6,31 +6,39 @@ import	(
 )
 
 //BANDS
+//Test if bands can be loaded from JSON file
 func Test_Bands_LoadBands(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	assert.True(t, bands.LoadBands())	//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	assert.True(t, allBands.LoadBands())//load bands from bands.json
+	bands := allBands["ETHDAI"]			//grab all bands for token pair ETHDAI
 	assert.NotEmpty(t, bands.BuyBands)	//check buy bands exist
 	assert.NotEmpty(t, bands.SellBands)	//check sell bands exist
 }
 
+//Test band parameter verification
 func Test_Bands_VerifyBands(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
-	assert.True(t, bands.VerifyBands())	//verify if bands have correct paramters
+	allBands := make(AllBands)				//create bands instance
+	allBands.LoadBands()					//load bands from bands.json
+	bands := allBands["ETHDAI"]				//get bands for "ETHDAI" pair
+	assert.True(t, (&bands).VerifyBands())	//verify if bands have correct paramters
 }
 
+//Test if different bands overlap
 func Test_Bands_BandsOverlap1(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
-	assert.False(t, bands.BandsOverlap())	//check if bands overlap - they should not
+	allBands := make(AllBands)					//create bands instance
+	allBands.LoadBands()						//load bands from bands.json
+	bands := allBands["ETHDAI"]					//get bands for "ETHDAI" pair
+	assert.False(t, (&bands).BandsOverlap())	//check if bands overlap - they should not
 }
 
+//Test if two of the same bands overlap
 func Test_Bands_BandsOverlap2(t* testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)					//create bands instance
+	allBands.LoadBands()						//load bands from bands.json
+	bands := allBands["ETHDAI"]				//get bands for "ETHDAI"
 	bands.BuyBands = append(bands.BuyBands, bands.BuyBands[0])	//clone buy band
-	bands.BuyBands[1].MinMargin = .005							//modify band to fall within range of band[0]
-	assert.True(t, bands.BandsOverlap())						//check if bands overlap - they should
+	(&bands).BuyBands[1].MinMargin = .005		//modify band to fall within range of band[0]
+	assert.True(t, bands.BandsOverlap())		//check if bands overlap - they should
 }
 
 func Test_Bands_ExcessiveBuyOrders(t *testing.T) {
@@ -129,33 +137,37 @@ func Test_Bands_OutsideOrders8(t *testing.T) {
 //BAND
 //Test if band has improper parameters
 func Test_Band_VerifyBand1(t *testing.T) {
-	bands := new(Bands)								//create bands instance
-	bands.LoadBands()								//load bands from bands.json
+	allBands := make(AllBands)						//create bands instance
+	allBands.LoadBands()							//load bands from bands.json
+	bands := allBands["ETHDAI"]						//get all bands from token pair ETHDAI
 	assert.Nil(t, bands.BuyBands[0].VerifyBand())	//assert band is valid
 }
 
 //Test if band has improper parameters
 func Test_Band_VerifyBand2(t *testing.T) {
-	bands := new(Bands)								//create bands instance
-	bands.LoadBands()								//load bands from bands.json
-	band := &bands.BuyBands[0]						//get buy band
+	allBands := make(AllBands)						//create bands instance
+	allBands.LoadBands()							//load bands from bands.json
+	bands := allBands["ETHDAI"]						//get all bands for token pair ETHDAI
+	band := bands.BuyBands[0]						//get buy band
 	band.MinMargin = band.AvgMargin + 0.000001		//set MinMargin to be AvgMargin++
 	assert.Error(t, band.VerifyBand())				//assert band is invalid
 }
 
 //Test if band has improper parameters
 func Test_Band_VerifyBand3(t *testing.T) {
-	bands := new(Bands)								//create bands instance
-	bands.LoadBands()								//load bands from bands.json
-	band := &bands.BuyBands[0]						//get buy band
+	allBands := make(AllBands)						//create bands instance
+	allBands.LoadBands()							//load bands from bands.json
+	bands :=allBands["ETHDAI"]						//get all bands for token pair ETHDAI
+	band := bands.BuyBands[0]						//get buy band
 	band.AvgMargin = band.MaxMargin + 0.000001		//set AvgMargin to be MaxMargin++
 	assert.Error(t, band.VerifyBand())				//assert band is invalid
 }
 
 //Test if band has improper parameters
 func Test_Band_VerifyBand4(t *testing.T) {
-	bands := new(Bands)								//create bands instance
-	bands.LoadBands()								//load bands from bands.json
+	allBands := make(AllBands)						//create bands instance
+	allBands.LoadBands()							//load bands from bands.json
+	bands := allBands["ETHDAI"]						//get all bands for token pair ETHDAI
 	band := &bands.BuyBands[0]						//get buy band
 	band.MinMargin = band.MaxMargin					//set MinMargin to be MaxMargin
 	assert.Error(t, band.VerifyBand())				//assert band is invalid
@@ -163,8 +175,9 @@ func Test_Band_VerifyBand4(t *testing.T) {
 
 //Test if band has improper parameters
 func Test_Band_VerifyBand5(t *testing.T) {
-	bands := new(Bands)								//create bands instance
-	bands.LoadBands()								//load bands from bands.json
+	allBands := make(AllBands)						//create bands instance
+	allBands.LoadBands()							//load bands from bands.json
+	bands := allBands["ETHDAI"]						//get all bands for token pair ETHDAI
 	band := &bands.BuyBands[0]						//get buy band
 	band.MinAmount = band.AvgAmount + 0.00001		//set MinAmount to be AvgAmount++
 	assert.Error(t, band.VerifyBand())				//assert band is invalid
@@ -172,8 +185,9 @@ func Test_Band_VerifyBand5(t *testing.T) {
 
 //Test if band has improper parameters
 func Test_Band_VerifyBand6(t *testing.T) {
-	bands := new(Bands)								//create bands instance
-	bands.LoadBands()								//load bands from bands.json
+	allBands := make(AllBands)						//create bands instance
+	allBands.LoadBands()							//load bands from bands.json
+	bands := allBands["ETHDAI"]						//get all bands for token pair ETHDAI
 	band := &bands.BuyBands[0]						//get buy band
 	band.AvgAmount = band.MaxAmount + 0.00001		//set AvgAmount to be MaxAmount++
 	assert.Error(t, band.VerifyBand())				//assert band is invalid
@@ -181,8 +195,9 @@ func Test_Band_VerifyBand6(t *testing.T) {
 
 //Test if band has improper parameters
 func Test_Band_VerifyBand7(t *testing.T) {
-	bands := new(Bands)								//create bands instance
-	bands.LoadBands()								//load bands from bands.json
+	allBands := make(AllBands)						//create bands instance
+	allBands.LoadBands()							//load bands from bands.json
+	bands := allBands["ETHDAI"]						//get all bands for token pair ETHDAI
 	band := &bands.BuyBands[0]						//get buy band
 	band.MinAmount = band.MaxAmount + 0.00001		//set MinAmount to be MaxAmount++
 	assert.Error(t, band.VerifyBand())				//assert band is invalid
@@ -241,8 +256,9 @@ func Test_Band_ExecessiveOrders3(t *testing.T) {
 //No return value, can't test individually
 //This is tested as a dependancy in excessiveOrders
 func Test_Band_GetAllCombinationsOfSizeN(t *testing.T) {
-	bands := new(Bands)								//create bands instance
-	bands.LoadBands() 								//load banks from bands.json
+	allBands := make(AllBands)						//create bands instance
+	allBands.LoadBands() 							//load banks from bands.json
+	bands := allBands["ETHDAI"]						//get all bands for token pair ETHDAI
 	band := &bands.BuyBands[0]						//get buy band
 	askOrders := []*Order{							//create orders
 		&Order{"DAIUSD", "BK01", 1, 1.000428, 14.13, 1, 1, "New", 0, 0, "1515755945"},
@@ -263,8 +279,9 @@ func Test_Band_CombinationUtil(t *testing.T) {
 
 //Test if band includes bid order with price at MinMargin
 func Test_Band_Includes1(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.00					//set ref price of asset to 1
 	orderPrice := (1 - band.MinMargin) * targetPrice	//calculate bid price to be on exactly MinMargin boundary
@@ -273,8 +290,9 @@ func Test_Band_Includes1(t *testing.T) {
 
 //Test if band includes bid order with price at MinMargin++
 func Test_Band_Includes2(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.00					//set ref price of asset to 1
 	orderPrice := (1 - band.MinMargin) * targetPrice + 0.000001	//calculate bid price to be just out of MinMargin boundary
@@ -283,8 +301,9 @@ func Test_Band_Includes2(t *testing.T) {
 
 //Test if band includes bid order with price at MaxMargin
 func Test_Band_Includes3(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]		//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.00					//set ref price of asset to 1
 	orderPrice := (1 - band.MaxMargin) * targetPrice		//calculate bid price to be exactly MaxMargin boundary
@@ -293,8 +312,9 @@ func Test_Band_Includes3(t *testing.T) {
 
 //Test if band includes bid order with price at MaxMargin--
 func Test_Band_Includes4(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.00					//set ref price of asset to 1
 	orderPrice := (1 - band.MaxMargin) * targetPrice - 0.000001	//calculate bid price to be just out of MaxMargin boundary
@@ -303,8 +323,9 @@ func Test_Band_Includes4(t *testing.T) {
 
 //Test if band includes ask order with price at MinMargin
 func Test_Band_Includes5(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.00					//set ref price of asset to 1
 	orderPrice := (1 + band.MinMargin) * targetPrice	//calculate ask price to be exactly MinMargin boundary
@@ -313,8 +334,9 @@ func Test_Band_Includes5(t *testing.T) {
 
 //Test if band includes ask order with price at MinMargin--
 func Test_Band_Includes6(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.00					//set ref price of asset to 1
 	orderPrice := (1 + band.MinMargin) * targetPrice - 0.000001	//calculate ask price to be just out of MaxMargin boundary
@@ -323,8 +345,9 @@ func Test_Band_Includes6(t *testing.T) {
 
 //Test if band includes ask order with price at MaxMargin
 func Test_Band_Includes7(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.00					//set ref price of asset to 1
 	orderPrice := (1 + band.MaxMargin) * targetPrice		//calculate ask price to be exactly MaxMargin boundary
@@ -333,8 +356,9 @@ func Test_Band_Includes7(t *testing.T) {
 
 //Test if band includes ask order with price at MaxMargin++
 func Test_Band_Includes8(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.00					//set ref price of asset to 1
 	orderPrice := (1 + band.MaxMargin) * targetPrice + 0.000001	//calculate ask price to be just out of MaxMargin boundary
@@ -342,8 +366,9 @@ func Test_Band_Includes8(t *testing.T) {
 }
 
 func Test_Band_TotalAmount1(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	askOrders := []*Order{
 		&Order{"DAIUSD", "BK01", 1, 1.000428, 14.13, 10.13, 1, "New", 0, 0, "1515755945"},
 		&Order{"DAIUSD", "BK02", 1, 1.000502, 10.17, 10.17, 1, "New", 0, 0, "1515755945"},
@@ -360,8 +385,9 @@ func Test_Band_TotalAmount1(t *testing.T) {
 }
 
 func Test_Band_TotalAmount2(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	askOrders := []*Order{
 		&Order{"DAIUSD", "BK01", 1, 1.000428, 14.13, 10.13, 1, "New", 0, 0, "1515755945"},
 		&Order{"DAIUSD", "BK02", 1, 1.000502, 10.17, 10.17, 1, "New", 0, 0, "1515755945"},
@@ -379,8 +405,9 @@ func Test_Band_TotalAmount2(t *testing.T) {
 
 //BUY BAND
 func Test_BuyBand_Includes1(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.0 					//set ref price to 1.0
 	orderPrice := (1 - band.MinMargin) * targetPrice			//calculate bid price to be on exactly MinMargin boundary
@@ -388,8 +415,9 @@ func Test_BuyBand_Includes1(t *testing.T) {
 }
 
 func Test_BuyBand_Includes2(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.0 					//set ref price to 1.0
 	orderPrice := (1 - band.MinMargin) * targetPrice + 0.00001	//calculate bid price to be just out of  MinMargin++ boundary
@@ -397,8 +425,9 @@ func Test_BuyBand_Includes2(t *testing.T) {
 }
 
 func Test_BuyBand_Includes3(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.0 					//set ref price to 1.0
 	orderPrice := (1 - band.MaxMargin) * targetPrice			//calculate bid price to be on exactly MaxMargin boundary
@@ -406,8 +435,9 @@ func Test_BuyBand_Includes3(t *testing.T) {
 }
 
 func Test_BuyBand_Includes4(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.0 					//set ref price to 1.0
 	orderPrice := (1 - band.MaxMargin) * targetPrice - 0.00001	//calculate bid price to be just out of  MaxMargin-- boundary
@@ -416,8 +446,9 @@ func Test_BuyBand_Includes4(t *testing.T) {
 
 
 func Test_BuyBand_ApplyMargin1(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.0					//set ref price to 1.0
 	margin := band.MinMargin 			//set margin to MinMargin
@@ -425,8 +456,9 @@ func Test_BuyBand_ApplyMargin1(t *testing.T) {
 }
 
 func Test_BuyBand_ApplyMargin2(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.0					//set ref price to 1.0
 	margin := band.MaxMargin 			//set margin to MaxMargin
@@ -434,8 +466,9 @@ func Test_BuyBand_ApplyMargin2(t *testing.T) {
 }
 
 func Test_BuyBand_AvgPrice(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.BuyBands[0]			//get buy band
 	targetPrice := 1.0					//set ref price to 1.0
 	margin := band.AvgMargin 			//set margin to AvgMargin
@@ -444,8 +477,9 @@ func Test_BuyBand_AvgPrice(t *testing.T) {
 
 //SELL BAND
 func Test_SellBand_Includes1(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.0 					//set ref price to 1.0
 	orderPrice := (1 + band.MinMargin) * targetPrice			//calculate bid price to be on exactly MinMargin boundary
@@ -453,8 +487,9 @@ func Test_SellBand_Includes1(t *testing.T) {
 }
 
 func Test_SellBand_Includes2(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.0 					//set ref price to 1.0
 	orderPrice := (1 + band.MinMargin) * targetPrice - 0.00001	//calculate bid price to be just out of  MinMargin-- boundary
@@ -462,8 +497,9 @@ func Test_SellBand_Includes2(t *testing.T) {
 }
 
 func Test_SellBand_Includes3(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.0 					//set ref price to 1.0
 	orderPrice := (1 + band.MaxMargin) * targetPrice			//calculate bid price to be on exactly MaxMargin boundary
@@ -471,8 +507,9 @@ func Test_SellBand_Includes3(t *testing.T) {
 }
 
 func Test_SellBand_Includes4(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.0 					//set ref price to 1.0
 	orderPrice := (1 + band.MaxMargin) * targetPrice + 0.00001	//calculate bid price to be just out of MinMargin boundary
@@ -480,8 +517,9 @@ func Test_SellBand_Includes4(t *testing.T) {
 }
 
 func Test_SellBand_ApplyMargin1(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.0					//set ref price to 1.0
 	margin := band.MinMargin 			//set margin to MinMargin
@@ -489,8 +527,9 @@ func Test_SellBand_ApplyMargin1(t *testing.T) {
 }
 
 func Test_SellBand_ApplyMargin2(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.0					//set ref prie to 1.0
 	margin := band.MaxMargin 			//set margin to MaxMargin
@@ -498,8 +537,9 @@ func Test_SellBand_ApplyMargin2(t *testing.T) {
 }
 
 func Test_SellBand_AvgPrice(t *testing.T) {
-	bands := new(Bands)					//create bands instance
-	bands.LoadBands()					//load bands from bands.json
+	allBands := make(AllBands)			//create bands instance
+	allBands.LoadBands() 				//load banks from bands.json
+	bands := allBands["ETHDAI"]			//get all bands for token pair ETHDAI
 	band := bands.SellBands[0]			//get sell band
 	targetPrice := 1.0					//set ref price to 1.0
 	margin := band.AvgMargin 			//set margin to AvgMargin

@@ -70,7 +70,7 @@ func MarketMaker(gatecoin *api.GatecoinClient, CONFIG *config.Config) {
 
 //Updates the in-memory orderbook.
 func SynchronizeOrders(gatecoin *api.GatecoinClient) (error) {
-	//reset NEW orderbook
+	//reset orderbook
 	for _, quoteMap := range orderBook {
 		for _, orderTypes := range quoteMap {
 			orderTypes.Asks = nil
@@ -92,18 +92,23 @@ func SynchronizeOrders(gatecoin *api.GatecoinClient) (error) {
 
 	//populate orderbook
 	for i, order := range resp.Orders {
+		//initialize orderbool
 		base, quote := registry.LookupTokenPair(order.Code)
+		log.WithFields(logrus.Fields{"base": base, "quote": quote, "pair": order.Code}).Debug("Registry lookup")
 		if (orderBook[base] == nil) {
+			log.Debug("Initializing quote to *Orders map")
 			orderBook[base] = make(map[string]*Orders)
 		}
-		if (orderBook[base][quote].Bids == nil || orderBook[base][quote].Asks == nil) {
-			orderBook[base][quote] = &Orders{Asks: make(map[string]Order), Bids: make(map[string]Order)}
-		}
+		orderBook[base][quote] = &Orders{Asks: make(map[string]Order), Bids: make(map[string]Order)}
+
+		//divide orders into asks and bids
 		if (order.Side == 0) {
 			log.WithFields(logrus.Fields{"orderNum": i, "pair": order.Code, "orderId": order.OrderId, "type": "bid", "price": order.Price, "initialQuantity": order.InitQuantity, "remainingQuantity": order.RemQuantity, "timestamp": order.Date}).Debug()
+			//insert into orderbook
 			(orderBook[base])[quote].Bids[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
 		} else if (order.Side == 1) {
 			log.WithFields(logrus.Fields{"orderNum": i, "pair": order.Code, "orderId": order.OrderId, "type": "ask", "price": order.Price, "initialQuantity": order.InitQuantity, "remainingQuantity": order.RemQuantity, "timestamp": order.Date}).Debug()
+			//insert into orderbook
 			(orderBook[base])[quote].Asks[order.OrderId] = Order{order.Code, order.OrderId, order.Side, order.Price, order.InitQuantity, order.RemQuantity, order.Status, order.StatusDesc, order.TxSeqNo, order.Type, order.Date}
 		}
 	}
