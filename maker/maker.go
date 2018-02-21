@@ -99,7 +99,9 @@ func SynchronizeOrders(gatecoin *api.GatecoinClient) (error) {
 			log.Debug("Initializing quote to *Orders map")
 			orderBook[base] = make(map[string]*Orders)
 		}
-		orderBook[base][quote] = &Orders{Asks: make(map[string]Order), Bids: make(map[string]Order)}
+		if (orderBook[base][quote] == nil) {
+			orderBook[base][quote] = &Orders{Asks: make(map[string]Order), Bids: make(map[string]Order)}
+		}
 
 		//divide orders into asks and bids
 		if (order.Side == 0) {
@@ -363,9 +365,11 @@ func PrintOrderBook(gatecoin *api.GatecoinClient) (error) {
 		for _, orders := range quoteSet {
 			data := [][]string{}
 			for _, order := range orders.Asks {
+				log.Debug("Appending Ask Order")
 				data = append(data, []string{order.Code, "Ask", order.OrderId, strconv.FormatFloat(order.Price, 'f', 6, 64), strconv.FormatFloat(order.InitQuantity, 'f', 6, 64), strconv.FormatFloat(order.RemQuantity, 'f', 6, 64), order.Date})
 			}
 			for _, order := range orders.Bids {
+				log.Debug("Appending Bid Order")
 				data = append(data, []string{order.Code, "Bid", order.OrderId, strconv.FormatFloat(order.Price, 'f', 6, 64), strconv.FormatFloat(order.InitQuantity, 'f', 6, 64), strconv.FormatFloat(order.RemQuantity, 'f', 6, 64), order.Date})
 			}
 			table := tablewriter.NewWriter(os.Stdout)

@@ -43,19 +43,10 @@ func main() {
 	CREDENTIALS := new(config.Auth)
 	config.LoadCredentials(CREDENTIALS)
 
-	//Load Bands
-	//bands := new(maker.Bands)
-
-	//bands := make(maker.AllBands)
-	//if(!bands.LoadBands()) {
-	//	return
-	//}
-
 	//Create Gatecoin API Client
 	client := api.NewGatecoinClient(CREDENTIALS.Key, CREDENTIALS.Secret)
 
 	//Execute market maker on interval
-	//scheduler(func() {maker.MarketMaker(client, bands, CONFIG)}, 5 * time.Second)
 	scheduler(func() {maker.MarketMaker(client, CONFIG)}, 5 * time.Second)
 
 	/*
@@ -109,20 +100,3 @@ func main() {
 
 	return
 }
-
-/*TO DO:
-Create Analytics
-	timer on API calls so we can get average for latency and identify spikes, maybe use for dynamic adjusting frequency of scheduler later since higher responsiveness to volatility is lower risk
-	
-		API latency
-		Daily Sold
-		Daily Bought
-		Daily Profit
-		Net Sold
-		Net Bought
-		Net Profit
-
-Dont have orderbook be a global and just have it be initialized in topUpBands() and then passed to synchronizeOrders and topUpBuyBands and topUpSellBands
-
-In excessiveOrders() or in includes() need to add a check for order.Side, otherwise you will have bids which get included in sell band orders because of their price.
-*/
