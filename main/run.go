@@ -13,6 +13,7 @@ import(
 //Globals
 var log *logrus.Logger
 
+//Schedules process to execute on interval
 func scheduler(what func(), delay time.Duration) {
 	fmt.Printf("Starting scheduled process on interval %d\n", delay)
 	ticker := time.NewTicker(delay)
@@ -48,55 +49,5 @@ func main() {
 
 	//Execute market maker on interval
 	scheduler(func() {maker.MarketMaker(client, CONFIG)}, 5 * time.Second)
-
-	/*
-	//TO DO - create real test scripts for these
-	//Test Public Queries
-	ticker, err := client.GetTickers()
-	if err != nil {
-		log.Error("%s", err.Error())
-	}
-
-	marketDepth, err := client.GetMarketDepth("DAIUSD")
-	if err != nil {
-		fmt.Printf("%s", err.Error())
-	}
-	fmt.Printf("%+v", marketDepth)
-
-	transactions, err := client.GetTransactions("BTCUSD")
-	if err != nil {
-		fmt.Printf("%s", err.Error())
-	}
-	fmt.Printf("%+v", transactions)
-
-	//Test Private Queries
-	balances, err := client.GetBalances("DAI")
-	if err != nil {
-		fmt.Printf("%s", err.Error())
-	}
-	fmt.Printf("%+v", balances)
-
-	//Create Order
-	resp, err := client.CreateOrder("DAIUSD", "bid", "1", "0.01")
-	if err != nil {
-		fmt.Printf("%s\n", err.Error())
-	}
-	fmt.Printf("\n%+v\n", resp)
-
-	//Get Order
-	order, err := client.GetOrders()
-	if err != nil {
-		fmt.Printf("%s\n", err.Error())
-	}
-	fmt.Printf("\n%+v\n", order)
-
-	//Delete Order
-	cancel, err := client.DeleteOrder(resp.OrderId)
-	if err != nil {
-		fmt.Printf("%s\n", err.Error())
-	}
-	fmt.Printf("\n%+v\n", cancel)
-	*/
-
 	return
 }
