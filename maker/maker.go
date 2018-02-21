@@ -148,12 +148,12 @@ func TopUpBuyBands(gatecoin *api.GatecoinClient, tokenPair string, orders []*Ord
 	//lookup token pair components
 	_, quote := registry.LookupTokenPair(tokenPair)
 	//get balance of quote token
- 	availableBalances, err := gatecoin.GetBalances(quote)
+ 	availableBalance, err := gatecoin.GetBalance(quote)
  	if err != nil {
  		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "topUpBuyBands", "token": quote, "error": err.Error()}).Error("Failed to get balances")
  		return
 	}
-	availableQuoteBalance := availableBalances.Balances[0].AvailableBalance
+	availableQuoteBalance := availableBalance.Balance.AvailableBalance
  	inBandBuyOrders := []*Order{}
  	//iterate through buy bands 
  	for _, buyBand := range buyBands {
@@ -205,12 +205,12 @@ func TopUpSellBands(gatecoin *api.GatecoinClient, tokenPair string, orders []*Or
 	//lookup token pair components
 	base, _ := registry.LookupTokenPair(tokenPair)
 	//get balance of base token
-	availableBalances, err := gatecoin.GetBalances(base)
+	availableBalance, err := gatecoin.GetBalance(base)
 	if err != nil {
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "topUpBuyBands", "error": err.Error()}).Error("Failed to get balances")
 		return
 	}
-	availableBaseBalance := availableBalances.Balances[0].AvailableBalance 
+	availableBaseBalance := availableBalance.Balance.AvailableBalance 
 	inBandSellOrders := []*Order{}
  	//iterate through sell bands 
  	for _, sellBand := range sellBands {
@@ -386,5 +386,32 @@ func PrintOrderBook(gatecoin *api.GatecoinClient) (error) {
 			table.Render()
 		} 
 	}
+	return nil
+}
+
+func PrintBalances(gatecoin *api.GatecoinClient) (error) {
+	resp, err := gatecoin.GetBalances()
+	if err != nil {
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "error": err}).Error("Failed to query token balances")
+		return err
+	}
+	data := [][]string{}
+	
+	for _, balance := range resp.Balances {
+		log.Info(balance.Currency)
+		data = append(data, []string{balance.Currency, strconv.FormatFloat(balance.Balance, 'f', 6, 64), strconv.FormatFloat(balance.AvailableBalance, 'f', 6, 64), strconv.FormatFloat(balance.PendingIncoming, 'f', 6, 64), strconv.FormatFloat(balance.PendingOutgoing, 'f', 6, 64), strconv.FormatFloat(balance.OpenOrder, 'f', 6, 64)})
+	}
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Currency", "Balance", "AvailableBalance", "PendingBalance", "PendingOutgoing", "OpenOrder"})
+	table.SetHeaderColor(
+		tablewriter.Colors{tablewriter.Bold},
+		tablewriter.Colors{tablewriter.Bold},
+		tablewriter.Colors{tablewriter.Bold},
+		tablewriter.Colors{tablewriter.Bold},
+		tablewriter.Colors{tablewriter.Bold},
+		tablewriter.Colors{tablewriter.Bold})
+	table.AppendBulk(data)
+	table.Render()
 	return nil
 }

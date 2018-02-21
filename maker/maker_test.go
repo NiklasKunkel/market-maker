@@ -32,6 +32,7 @@ func Test_Maker_SynchronizeOrders1(t  *testing.T) {
 
 func Test_Maker_SynchronizeOrders2(t *testing.T) {
 	gatecoin := SetupGatecoinClient(t)
+	time.Sleep(1000 * time.Millisecond)
 	err := SynchronizeOrders(gatecoin)
 	assert.Nil(t, err)
 	time.Sleep(1000 * time.Millisecond)

@@ -59,7 +59,12 @@ type Transaction struct {
 }
 
 type BalancesResponse struct {
-	Balances 	[]Balance 		`json:"balances"`
+	Balances 		[]Balance 		`json:"balances"`
+	Status 			ResponseStatus 	`json:"responseStatus"`
+}
+
+type BalanceResponse struct {
+	Balance 	Balance 		`json:"balance"`
 	Status 		ResponseStatus 	`json:"responseStatus"`
 }
 

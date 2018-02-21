@@ -216,16 +216,28 @@ func (gatecoin *GatecoinClient) GetTransactions(pair string) (*TransactionsRespo
 //                          PRIVATE API METHODS                        //
 /////////////////////////////////////////////////////////////////////////
 
-func (gatecoin *GatecoinClient) GetBalances(pair string) (*BalancesResponse, error) {
+func (gatecoin *GatecoinClient) GetBalances() (*BalancesResponse, error) {
 	resp, err := gatecoin.queryPrivate(
 		"GET",
-		[]string{"Balance/Balances", pair},
+		[]string{"Balance/Balances"},
 		[]byte{},
 		&BalancesResponse{})
 	if err != nil {
 		return nil, err
 	}
 	return resp.(*BalancesResponse), nil
+}
+
+func (gatecoin *GatecoinClient) GetBalance(currency string) (*BalanceResponse, error) {
+	resp, err := gatecoin.queryPrivate(
+		"GET",
+		[]string{"Balance/Balances", currency},
+		[]byte{},
+		&BalanceResponse{})
+	if err != nil {
+		return nil, err
+	}
+	return resp.(*BalanceResponse), nil
 }
 
 func (gatecoin *GatecoinClient) CreateOrder(pair string, way string, amount string, price string) (*CreateOrderResponse, error) {
