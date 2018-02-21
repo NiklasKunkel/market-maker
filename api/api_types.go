@@ -25,8 +25,8 @@ type Ticker struct {
 	Volumn 	float64 	`json:"volumn,omitmepty"`
 	Bid 	float64 	`json:"bid,omitmepty"`
 	BidQ 	float64 	`json:"bidQ,omitmepty"`
-	ask 	float64 	`json:"ask,omitmepty"`
-	askQ 	float64 	`json:"askQ,omitmepty"`
+	Ask 	float64 	`json:"ask,omitmepty"`
+	AskQ 	float64 	`json:"askQ,omitmepty"`
 	Vwap 	float64 	`json:"vwap,omitmepty"`
 	Time 	string 		`json:"createDateTime"`
 }
@@ -90,8 +90,13 @@ type NewOrder struct {
 	Price 	string	`json:"Price"`
 }
 
-type GetOrderResponse struct {
+type GetOrdersResponse struct {
 	Orders 	[]Order 		`json:"orders"`
+	Status 	ResponseStatus 	`json:"responseStatus"`
+}
+
+type GetOrderResponse struct {
+	Order 	Order			`json:"order"`
 	Status 	ResponseStatus 	`json:"responseStatus"`
 }
 

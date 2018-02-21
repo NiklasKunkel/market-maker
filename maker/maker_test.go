@@ -24,7 +24,7 @@ func SetupGatecoinClient(t *testing.T) (*api.GatecoinClient) {
 	return client
 }
 
-func Test_Maker_SynchronizeOrders1(t  *testing.T) {
+func Test_Maker_SynchronizeOrders1(t *testing.T) {
 	gatecoin := SetupGatecoinClient(t)
 	err := SynchronizeOrders(gatecoin)
 	assert.Nil(t, err)

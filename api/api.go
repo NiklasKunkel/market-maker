@@ -231,7 +231,7 @@ func (gatecoin *GatecoinClient) GetBalances() (*BalancesResponse, error) {
 func (gatecoin *GatecoinClient) GetBalance(currency string) (*BalanceResponse, error) {
 	resp, err := gatecoin.queryPrivate(
 		"GET",
-		[]string{"Balance/Balances", currency},
+		[]string{"Balance/Balances", strings.ToUpper(currency)},
 		[]byte{},
 		&BalanceResponse{})
 	if err != nil {
@@ -242,6 +242,8 @@ func (gatecoin *GatecoinClient) GetBalance(currency string) (*BalanceResponse, e
 
 func (gatecoin *GatecoinClient) CreateOrder(pair string, way string, amount string, price string) (*CreateOrderResponse, error) {
 	//compose order obj
+	//price denominated in quote / base
+	//amount denominated in base
 	order := NewOrder{pair, way, amount, price}
 	//convert to json string
 	orderJson, err := json.Marshal(order)
@@ -260,17 +262,29 @@ func (gatecoin *GatecoinClient) CreateOrder(pair string, way string, amount stri
 	return resp.(*CreateOrderResponse), nil
 }
 
-func (gatecoin *GatecoinClient) GetOrders() (*GetOrderResponse, error) {
+func (gatecoin *GatecoinClient) GetOrders() (*GetOrdersResponse, error) {
 	resp, err := gatecoin.queryPrivate(
 		"GET",
 		[]string{"Trade/Orders"},
+		[]byte{},
+		&GetOrdersResponse{})
+	if err != nil {
+		return nil, err
+	}
+	return resp.(*GetOrdersResponse), nil
+}
+
+func (gatecoin *GatecoinClient) GetOrder(id string) (*GetOrderResponse, error) {
+	resp, err := gatecoin.queryPrivate(
+		"GET",
+		[]string{"Trade/Orders", id},
 		[]byte{},
 		&GetOrderResponse{})
 	if err != nil {
 		return nil, err
 	}
 	return resp.(*GetOrderResponse), nil
-} 
+}
 
 func (gatecoin *GatecoinClient) DeleteOrder(id string) (*KillOrderResponse, error) {
 	resp, err := gatecoin.queryPrivate(
