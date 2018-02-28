@@ -14,6 +14,7 @@ import(
 	"strings"
 	"time"
 	"github.com/niklaskunkel/market-maker/logger"
+	"github.com/niklaskunkel/market-maker/registry"
 	"github.com/sirupsen/logrus"
 )
 
@@ -69,6 +70,10 @@ func (gatecoin *GatecoinClient) queryPublic(params []string, typ interface{}) (i
 
 	//set type of request
 	requestType := "GET"
+
+	//record time in registry
+	registry.SetExchangeApiPublicTimeout("Gatecoin")
+
 	resp, err := gatecoin.doRequest(reqURL, requestType, nil, []byte{}, typ)
 	return resp, err
 }
@@ -111,6 +116,9 @@ func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string
 		"API_REQUEST_DATE": nonce,
 	}
 
+	//record time in registry
+	registry.SetExchangeApiPrivateTimeout("Gatecoin")
+
 	resp, err := gatecoin.doRequest(reqURL, requestType, headers, data, responseType)
 	return resp, err
 }
@@ -141,7 +149,7 @@ func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, h
 		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequest", "requestType": requestType, "requestURL": reqURL.String(), "data": data, "request": req, "error": err.Error()}).Error("Failed to execute request")
 		return nil, err
 	}
-	defer resp.Body.Close() 
+	defer resp.Body.Close()
 
 	//Read response
 	body, err := ioutil.ReadAll(resp.Body)

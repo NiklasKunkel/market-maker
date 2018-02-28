@@ -48,6 +48,6 @@ func main() {
 	client := api.NewGatecoinClient(CREDENTIALS.Key, CREDENTIALS.Secret)
 
 	//Execute market maker on interval
-	scheduler(func() {maker.MarketMaker(client, CONFIG)}, 5 * time.Second)
+	scheduler(func() {maker.MarketMaker(client, CONFIG)}, 20 * time.Second)
 	return
 }
