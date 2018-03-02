@@ -233,10 +233,8 @@ func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType Ba
 			ordersInBand = append(ordersInBand, order)
 		}
 	}
-	//Debug
-	log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType}).Debug("Orders Included in Band:")
 	for _, orderInBand := range ordersInBand {
-		log.WithFields(logrus.Fields{"orderId": orderInBand.OrderId, "RemQuantity": orderInBand.RemQuantity}).Debug("Order In Band")
+		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType, "orderId": orderInBand.OrderId, "RemQuantity": orderInBand.RemQuantity,}).Debug("Order Included in Band")
 	}
 	if (band.TotalAmount(ordersInBand) > band.MaxAmount) {
 		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType, "totalAmount": band.TotalAmount(ordersInBand), "maxAmount": band.MaxAmount}).Info("Total Order Amount Exceeded, finding orders to cancel...")

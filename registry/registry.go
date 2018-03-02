@@ -61,7 +61,7 @@ var ExchangeTokenPairRegistry = map[string]ExchangeList {
 }
 
 var ExchangeApiTimeoutRegistry = map[string]*ApiTimeout {
-	"GATECOIN": &ApiTimeout{PUBLICTIMEOUT: 1000, PRIVATETIMEOUT: 1000, LastPublicExecution: 0, LastPrivateExecution: 0},
+	"GATECOIN": &ApiTimeout{PUBLICTIMEOUT: 2000, PRIVATETIMEOUT: 2000, LastPublicExecution: 0, LastPrivateExecution: 0},
 	"ETHFINEX": &ApiTimeout{PUBLICTIMEOUT: 1000, PRIVATETIMEOUT: 1000, LastPublicExecution: 0, LastPrivateExecution: 0},
 }
 

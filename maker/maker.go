@@ -183,6 +183,7 @@ func TopUpBuyBands(gatecoin *api.GatecoinClient, tokenPair string, orders []*Ord
  			if ((payAmount >= buyBand.DustCutoff) && (payAmount > float64(0)) && (buyAmount > float64(0))) {
  				//lookup Gatecoin token pair syntax
  				gatecoinTokenPair := registry.LookupGatecoinTokenPairName(tokenPair)
+ 				//adjust amount and price with precision limits for each exchange
  				adjustedAmount := strconv.FormatFloat(buyAmount, 'f', precision.BIDAMOUNTPRECISION, 64)
  				adjustedPrice := strconv.FormatFloat(price, 'f', precision.BIDPRICEPRECISION, 64)
  				//log attempted order creation
@@ -282,7 +283,7 @@ func GetFeedPrice(pair string, config *config.Config) (float64, error) {
         		continue
     		}
     		log.WithFields(logrus.Fields{"function": "GetFeedPrice", "exchange": exchange, "pair": pair, "price": string(out)}).Debug("Setzer price fetch returned price")
-    		price, err := strconv.ParseFloat(string(out[:len(out) - 2]), 64)
+    		price, err := strconv.ParseFloat(string(out[:len(out) - 1]), 64)
     		if err != nil {
     			log.WithFields(logrus.Fields{"function": "GetFeedPrice", "exchange": exchange, "pair": pair, "price": string(out), "error": err.Error()}).Error("Failed to parse price from string to float")
     			continue
@@ -328,7 +329,7 @@ func CancelAllOrders(gatecoin *api.GatecoinClient) {
 				} else if resp.Status.Message != "OK" {
 					log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to cancel order")
 				}
-				log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Info("Cancelled Order")
+				log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": id}).Info("Cancelled Order")
 			}
 			for id, _ := range orders.Asks {
 				log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": id}).Info("Cancelling order...")
@@ -338,7 +339,7 @@ func CancelAllOrders(gatecoin *api.GatecoinClient) {
 				} else if resp.Status.Message != "OK" {
 					log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Error("Failed to cancel order")
 				}
-				log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "CancelAllOrders", "orderId": id, "message": resp.Status.Message, "errorCode": resp.Status.ErrorCode}).Info("Cancelled Order")
+				log.WithFields(logrus.Fields{"client": "Gatecoin", "orderId": id}).Info("Cancelled Order")
 			}
 		}
 	}

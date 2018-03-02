@@ -71,8 +71,13 @@ func (gatecoin *GatecoinClient) queryPublic(params []string, typ interface{}) (i
 	//set type of request
 	requestType := "GET"
 
+	//wait until api call limit interval has been exceeded
+	timeout := time.Duration(registry.GetExchangeApiPublicTimeout("gatecoin")) * time.Millisecond
+	time.Sleep(timeout)
+	log.WithFields(logrus.Fields{"client": "Gatecoin", "interval": timeout}).Debug("Sleeping until public API Timeout reset")
+
 	//record time in registry
-	registry.SetExchangeApiPublicTimeout("Gatecoin")
+	registry.SetExchangeApiPublicTimeout("gatecoin")
 
 	resp, err := gatecoin.doRequest(reqURL, requestType, nil, []byte{}, typ)
 	return resp, err
@@ -115,6 +120,11 @@ func (gatecoin *GatecoinClient) queryPrivate(requestType string, params []string
 		"API_REQUEST_SIGNATURE": signature,
 		"API_REQUEST_DATE": nonce,
 	}
+
+	//wait until api call limit interval has been exceeded
+	timeout := time.Duration(registry.GetExchangeApiPrivateTimeout("gatecoin")) * time.Millisecond
+	time.Sleep(timeout)
+	log.WithFields(logrus.Fields{"client": "Gatecoin", "interval": timeout}).Debug("Sleeping until private API timeout reset")
 
 	//record time in registry
 	registry.SetExchangeApiPrivateTimeout("Gatecoin")
