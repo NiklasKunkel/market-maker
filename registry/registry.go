@@ -55,13 +55,13 @@ var TokenPairRegistry = map[string]TokenPair {
 var ExchangeTokenPairRegistry = map[string]ExchangeList {
 	"DAIUSD": ExchangeList{GATECOIN: ExchangeTokenInfo{TOKENPAIRNAME: "DAIUSD", PRECISION: Precision{BIDPRICEPRECISION: 10, ASKPRICEPRECISION: 10, BIDAMOUNTPRECISION: 10, ASKAMOUNTPRECISION: 10}}},
 	"ETHBTC": ExchangeList{GATECOIN: ExchangeTokenInfo{TOKENPAIRNAME: "ETHBTC", PRECISION: Precision{BIDPRICEPRECISION: 10, ASKPRICEPRECISION: 10, BIDAMOUNTPRECISION: 10, ASKAMOUNTPRECISION: 10}}},
-	"ETHDAI": ExchangeList{GATECOIN: ExchangeTokenInfo{TOKENPAIRNAME: "ETHDAI", PRECISION: Precision{BIDPRICEPRECISION: 2, ASKPRICEPRECISION: 10, BIDAMOUNTPRECISION: 10, ASKAMOUNTPRECISION: 10}}},
+	"ETHDAI": ExchangeList{GATECOIN: ExchangeTokenInfo{TOKENPAIRNAME: "ETHDAI", PRECISION: Precision{BIDPRICEPRECISION: 2, ASKPRICEPRECISION: 2, BIDAMOUNTPRECISION: 10, ASKAMOUNTPRECISION: 10}}},
 	"MKRBTC": ExchangeList{GATECOIN: ExchangeTokenInfo{TOKENPAIRNAME: "MKRBTC", PRECISION: Precision{BIDPRICEPRECISION: 10, ASKPRICEPRECISION: 10, BIDAMOUNTPRECISION: 10, ASKAMOUNTPRECISION: 10}}},
 	"MKRETH": ExchangeList{GATECOIN: ExchangeTokenInfo{TOKENPAIRNAME: "MKRETH", PRECISION: Precision{BIDPRICEPRECISION: 10, ASKPRICEPRECISION: 10, BIDAMOUNTPRECISION: 10, ASKAMOUNTPRECISION: 10}}},
 }
 
 var ExchangeApiTimeoutRegistry = map[string]*ApiTimeout {
-	"GATECOIN": &ApiTimeout{PUBLICTIMEOUT: 2000, PRIVATETIMEOUT: 2000, LastPublicExecution: 0, LastPrivateExecution: 0},
+	"GATECOIN": &ApiTimeout{PUBLICTIMEOUT: 1000, PRIVATETIMEOUT: 1000, LastPublicExecution: 0, LastPrivateExecution: 0},
 	"ETHFINEX": &ApiTimeout{PUBLICTIMEOUT: 1000, PRIVATETIMEOUT: 1000, LastPublicExecution: 0, LastPrivateExecution: 0},
 }
 
@@ -86,11 +86,13 @@ func MakeTimestamp() (int64) {
 
 func GetExchangeApiPublicTimeout(exchange string) (int64) {
 	if reg, ok := ExchangeApiTimeoutRegistry[strings.ToUpper(exchange)]; ok {
-		timeToWait := reg.PUBLICTIMEOUT + reg.LastPublicExecution - MakeTimestamp()
-		if (timeToWait <= 0) {
+		timestamp := MakeTimestamp()
+		timeToSleep := reg.PUBLICTIMEOUT + reg.LastPublicExecution - timestamp
+		log.WithFields(logrus.Fields{"function": "GetExchangeApiPublicTimeout", "exchange": exchange, "lastExecution": reg.LastPublicExecution, "currentTime": timestamp, "interval": reg.PUBLICTIMEOUT, "sleepTime": timeToSleep}).Debug("Getting public timeout")
+		if (timeToSleep <= 0) {
 			return 0
 		} else {
-			return timeToWait
+			return timeToSleep
 		}
 	}
 	log.WithFields(logrus.Fields{"function": "GetExchangeApiPublicTimeout", "exchange": exchange}).Error("Could not find exchange in ApiTimeoutRegistry")
@@ -99,11 +101,13 @@ func GetExchangeApiPublicTimeout(exchange string) (int64) {
 
 func GetExchangeApiPrivateTimeout(exchange string) (int64) {
 	if reg, ok := ExchangeApiTimeoutRegistry[strings.ToUpper(exchange)]; ok {
-    	timeToWait := reg.PRIVATETIMEOUT + reg.LastPrivateExecution - MakeTimestamp()
-		if (timeToWait <= 0) {
+		timestamp := MakeTimestamp()
+    	timeToSleep := reg.PRIVATETIMEOUT + reg.LastPrivateExecution - timestamp
+    	log.WithFields(logrus.Fields{"function": "GetExchangeApiPrivateTimeout", "exchange": exchange, "lastExecution": reg.LastPrivateExecution, "currentTime": timestamp, "interval": reg.PRIVATETIMEOUT, "sleepTime": timeToSleep}).Debug("Getting private timeout")
+		if (timeToSleep <= 0) {
 			return 0
 		} else {
-			return timeToWait
+			return timeToSleep
 		}
 	}
 	log.WithFields(logrus.Fields{"function": "GetExchangeApiPrivateTimeout", "exchange": exchange}).Error("Could not find exchange in ApiTimeoutRegistry")
@@ -113,7 +117,9 @@ func GetExchangeApiPrivateTimeout(exchange string) (int64) {
 func SetExchangeApiPublicTimeout(exchange string) {
 	exchange = strings.ToUpper(exchange)
 	if _, ok := ExchangeApiTimeoutRegistry[exchange]; ok {
-		ExchangeApiTimeoutRegistry[exchange].LastPrivateExecution = MakeTimestamp()
+		timestamp := MakeTimestamp()
+		log.WithFields(logrus.Fields{"function": "SetExchangeApiPublicTimeout", "exchange": exchange, "time": timestamp}).Debug("Setting public API last execution time")
+		ExchangeApiTimeoutRegistry[exchange].LastPublicExecution = timestamp
 		return
 	}
 	log.WithFields(logrus.Fields{"function": "SetExchangeApiPublicTimeout", "exchange": exchange}).Error("Could not find exchange in ApiTimeoutRegistry")
@@ -123,9 +129,11 @@ func SetExchangeApiPublicTimeout(exchange string) {
 func SetExchangeApiPrivateTimeout(exchange string) {
 	exchange = strings.ToUpper(exchange)
 	if _, ok := ExchangeApiTimeoutRegistry[exchange]; ok {
-		ExchangeApiTimeoutRegistry[exchange].LastPublicExecution = MakeTimestamp()
+		timestamp := MakeTimestamp()
+		log.WithFields(logrus.Fields{"function": "SetExchangeApiPrivateTimeout", "exchange": exchange, "time": timestamp}).Debug("Setting private API last execution time")
+		ExchangeApiTimeoutRegistry[exchange].LastPrivateExecution = timestamp
 		return
 	}
-	log.WithFields(logrus.Fields{"function": "SetExchangeApiPublicTimeout", "exchange": exchange}).Error("Could not find exchange in ApiTimeoutRegistry")
+	log.WithFields(logrus.Fields{"function": "SetExchangeApiPrivateTimeout", "exchange": exchange}).Error("Could not find exchange in ApiTimeoutRegistry")
 	return
 }

@@ -45,7 +45,7 @@ func main() {
 	config.LoadCredentials(CREDENTIALS)
 
 	//Create Gatecoin API Client
-	client := api.NewGatecoinClient(CREDENTIALS.Key, CREDENTIALS.Secret)
+	client := api.NewGatecoinClient("GATECOIN", CREDENTIALS.Key, CREDENTIALS.Secret)
 
 	//Execute market maker on interval
 	scheduler(func() {maker.MarketMaker(client, CONFIG)}, 20 * time.Second)

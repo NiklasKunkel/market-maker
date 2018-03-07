@@ -238,14 +238,14 @@ func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType Ba
 	}
 	if (band.TotalAmount(ordersInBand) > band.MaxAmount) {
 		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType, "totalAmount": band.TotalAmount(ordersInBand), "maxAmount": band.MaxAmount}).Info("Total Order Amount Exceeded, finding orders to cancel...")
-		log.WithFields(logrus.Fields{}).Debug("All Combinations")
+		//log.WithFields(logrus.Fields{}).Debug("All Combinations")
 		for size, _ := range ordersInBand {
 			band.GetAllCombinationsOfSizeN(ordersInBand, size + 1)
 		}
 		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType}).Debug("Valid Combinations of Orders:")
-		for _, combo := range validCombos {
-			for i, element := range combo {
-				log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType, "comboNumber": i + 1, "orderId": element.OrderId, "price": element.Price, "remQuantity": element.RemQuantity}).Debug("order in valid combo")
+		for comboNum, combo := range validCombos {
+			for _, element := range combo {
+				log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType, "comboNumber": comboNum, "comboSize": len(combo),"orderId": element.OrderId, "price": element.Price, "remQuantity": element.RemQuantity}).Debug("order in valid combo")
 			}
 		}
 		//filter combos by largest length - this means we have to cancel less orders (saves gas for dex)
@@ -263,7 +263,7 @@ func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType Ba
 				maxLength = comboLength
 			}
 		}
-		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "numberOfOrdersInCombo": maxLength, "indexOfCombo": maxIndex}).Debug("Best combination of orders found")
+		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "numberOfOrdersInCombo": maxLength, "comboNumber": maxIndex}).Debug("Best combination of orders found")
 		//Kill all orders not in our best combination
 		ordersToKill := []*Order{}
 		for _, order := range ordersInBand {
@@ -303,9 +303,9 @@ func (band *Band) CombinationUtil(input []*Order, output []*Order, start int, en
 			copy(temp, output)
 			validCombos = append(validCombos, temp)
 		}
-		for i, element := range output {
+		/*for i, element := range output {
 			log.WithFields(logrus.Fields{"function": "CombinationUtil", "comboSize": comboSize, "comboNumber": i + 1, "orderId": element.OrderId, "price": element.Price, "remQuantity": element.RemQuantity}).Debug("Order in possible combo")
-		}
+		}*/
 		return
 	}
 

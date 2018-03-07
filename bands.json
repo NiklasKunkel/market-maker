@@ -5,28 +5,28 @@
         "minMargin": 0.006,
         "avgMargin": 0.0065,
         "maxMargin": 0.0075,
-        "minAmount": 3500.0,
-        "avgAmount": 4050.0,
-        "maxAmount": 9100.0,
-        "dustCutoff": 75.0
+        "minAmount": 1,
+        "avgAmount": 5,
+        "maxAmount": 10,
+        "dustCutoff": 0.2
       },
       {
         "minMargin": 0.0075,
         "avgMargin": 0.01,
         "maxMargin": 0.0125,
-        "minAmount": 8000.0,
-        "avgAmount": 10050.0,
-        "maxAmount": 20100.0,
-        "dustCutoff": 75.0
+        "minAmount": 25.0,
+        "avgAmount": 50.0,
+        "maxAmount": 75.0,
+        "dustCutoff": 0.2
       },
       {
         "minMargin": 0.0125,
         "avgMargin": 0.0175,
         "maxMargin": 0.0225,
-        "minAmount": 16000.0,
-        "avgAmount": 20050.0,
-        "maxAmount": 30100.0,
-        "dustCutoff": 75.0
+        "minAmount": 50.0,
+        "avgAmount": 100.0,
+        "maxAmount": 150.0,
+        "dustCutoff": 0.2
       }
     ],
     "sellBands": [
@@ -34,28 +34,28 @@
         "minMargin": 0.006,
         "avgMargin": 0.0065,
         "maxMargin": 0.0075,
-        "minAmount": 3.5,
-        "avgAmount": 4.05,
-        "maxAmount": 9.1,
-        "dustCutoff": 0.07
+        "minAmount": 0.001349,
+        "avgAmount": 0.00674,
+        "maxAmount": 0.01349,
+        "dustCutoff": 0.001
       },
       {
         "minMargin": 0.0075,
         "avgMargin": 0.01,
         "maxMargin": 0.0125,
-        "minAmount": 8.0,
-        "avgAmount": 10.05,
-        "maxAmount": 20.1,
-        "dustCutoff": 0.07
+        "minAmount": 0.0337,
+        "avgAmount": 0.0674,
+        "maxAmount": 0.1011,
+        "dustCutoff": 0.001
       },
       {
         "minMargin": 0.0125,
         "avgMargin": 0.0175,
         "maxMargin": 0.0225,
-        "minAmount": 16.0,
-        "avgAmount": 20.05,
-        "maxAmount": 30.1,
-        "dustCutoff": 0.07
+        "minAmount": 0.0674,
+        "avgAmount": 0.134952767,
+        "maxAmount": 0.20242,
+        "dustCutoff": 0.0001
       }
     ]
   },

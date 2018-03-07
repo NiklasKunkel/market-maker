@@ -41,14 +41,15 @@ var privateMethods = []string {
 
 //Type Structs
 type GatecoinClient struct {
+	Name	string 			//Name of client
 	key 	string			//Gatecoin API Key
 	secret 	string			//Gatecoin Secret Key
 	client 	*http.Client 	
 }
 
-func NewGatecoinClient(key, secret string) (*GatecoinClient) {
+func NewGatecoinClient(name, key, secret string) (*GatecoinClient) {
 	client := &http.Client{}
-	return &GatecoinClient{key, secret, client}
+	return &GatecoinClient{strings.ToUpper(name), key, secret, client}
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -177,7 +178,7 @@ func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, h
 	apiError := ErrorResponse{}
 	err = json.Unmarshal(body, &apiError)
 	if err != nil {
-		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequest", "body": body, "request": req, "error": err.Error()}).Error("Failed to convert JSON response into error struct")
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequest", "body": string(body), "request": req, "error": err.Error()}).Error("Failed to convert JSON response into error struct")
 		return nil, err
 	}
 	if apiError.Status.Message != "OK" {
@@ -188,9 +189,8 @@ func (gatecoin *GatecoinClient) doRequest(reqURL *url.URL, requestType string, h
 	//Convert JSON to Response struct
 	err = json.Unmarshal(body, &responseType)
 	if err != nil {
-		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequestuest", "body": body, "request": req, "error": err.Error()}).Error("Failed to convert JSON response into struct")
+		log.WithFields(logrus.Fields{"client": "Gatecoin", "function": "doRequestuest", "body": string(body), "request": req, "error": err.Error()}).Error("Failed to convert JSON response into struct")
 		return nil, err
-		return nil, fmt.Errorf("[Gatecoin] (doRequest) Failed to convert JSON response into struct for query to %s! (%s)", reqURL, err.Error())
 	}
 	return responseType, nil
 }
