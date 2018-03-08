@@ -20,7 +20,7 @@ func SetupGatecoinClient(t *testing.T) (*api.GatecoinClient) {
 	assert.Nil(t, err)
 	err = json.Unmarshal(raw, credentials)
 	assert.Nil(t, err)
-	client := api.NewGatecoinClient(credentials.Key, credentials.Secret)
+	client := api.NewGatecoinClient("GATECOIN", credentials.Key, credentials.Secret)
 	return client
 }
 

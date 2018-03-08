@@ -267,7 +267,7 @@ func Test_Band_GetAllCombinationsOfSizeN(t *testing.T) {
 		&Order{"DAIUSD", "BK04", 1, 1.000788, 12.96, 4, 1, "New", 0, 0, "1515755945"},
 	}
 	for i := 1; i <= len(askOrders); i++ {
-		band.GetAllCombinationsOfSizeN(askOrders, i)
+		band.GetAllCombinationsOfSizeN(askOrders, i, band, 100.0)
 	}
 }
 

@@ -59,6 +59,7 @@ func (allBands AllBands) LoadBands() (bool) {
 	return true
 }
 
+
 func (allBands AllBands) PrintAllBands() {
 	for tokenPair, bands := range allBands {
 		log.Debug(tokenPair + "Bands:")
@@ -194,6 +195,8 @@ type Band struct {
 
 type BandType interface {
 	Includes(float64, float64) bool
+	AvgPrice(float64) float64
+	GetType() string
 }
 
 func (band *Band) VerifyBand() (error) {
@@ -236,11 +239,28 @@ func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType Ba
 	for _, orderInBand := range ordersInBand {
 		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType, "orderId": orderInBand.OrderId, "RemQuantity": orderInBand.RemQuantity,}).Debug("Order Included in Band")
 	}
-	if (band.TotalAmount(ordersInBand) > band.MaxAmount) {
-		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType, "totalAmount": band.TotalAmount(ordersInBand), "maxAmount": band.MaxAmount}).Info("Total Order Amount Exceeded, finding orders to cancel...")
+
+	//This block of logic is specific to Gatecoin because they denominated both bid and ask amounts in the base token.
+	//This causes us problems when trying to get the total amount of a token in certain band to try to check it against the band's MaxAmount
+	//When we integrate other exchanges we will want to move ExcessiveOrders (and possibly its derivatives relying on TotalAmount()) into the maker.go file and have switch statements for different exchanges
+	totalAmount := band.TotalAmount(ordersInBand)
+	if t, ok := bandType.(BandType); ok {
+		if t.GetType() == "BUY" {
+			//convert totalAmount denomination from base token to quote token by using average price of band
+			totalAmount = t.AvgPrice(refPrice) * totalAmount
+		} else if t.GetType() == "SELL" {
+			//no conversion necessary b/c sell band is already denominated in base token
+		} else {
+			log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "band": band}).Fatal("Using base band class rather than derived buy/sell band, this should never happen!")
+		}
+	}
+
+	//if (band.TotalAmount(ordersInBand) > band.MaxAmount) {
+	if totalAmount > band.MaxAmount {
+		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType, "totalAmount": totalAmount, "maxAmount": band.MaxAmount}).Info("Total Order Amount Exceeded, finding orders to cancel...")
 		//log.WithFields(logrus.Fields{}).Debug("All Combinations")
 		for size, _ := range ordersInBand {
-			band.GetAllCombinationsOfSizeN(ordersInBand, size + 1)
+			band.GetAllCombinationsOfSizeN(ordersInBand, size + 1, bandType, refPrice)
 		}
 		log.WithFields(logrus.Fields{"function": "ExcessiveOrders", "refPrice": refPrice, "bandType": bandType}).Debug("Valid Combinations of Orders:")
 		for comboNum, combo := range validCombos {
@@ -250,15 +270,18 @@ func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType Ba
 		}
 		//filter combos by largest length - this means we have to cancel less orders (saves gas for dex)
 		//if one or more combos share the largest length choose the one with the higher total amount
+		//NOTE: Due to Gatecoin base token denominations messing up TotalAmount() we now just uses a random longest combo.
 		maxLength := 0
 		maxIndex := -1
 		for i, combo := range validCombos {
 			comboLength := len(combo)
+			/*
 			if (comboLength == maxLength) {
 				if (band.TotalAmount(combo) > band.TotalAmount(validCombos[maxIndex])) {
 					maxIndex = i
 				}
-			} else if (comboLength > maxLength) {
+			} */
+			if (comboLength > maxLength) {
 				maxIndex = i
 				maxLength = comboLength
 			}
@@ -268,9 +291,11 @@ func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType Ba
 		ordersToKill := []*Order{}
 		for _, order := range ordersInBand {
 			keepOrder := false
-			for _, orderToKeep := range validCombos[maxIndex] {
-				if (order == orderToKeep) {
-					keepOrder = true
+			if maxIndex != -1 {
+				for _, orderToKeep := range validCombos[maxIndex] {
+					if (order == orderToKeep) {
+						keepOrder = true
+					}
 				}
 			}
 			if (keepOrder == false) {
@@ -288,17 +313,24 @@ func (band *Band) ExcessiveOrders(orders []*Order, refPrice float64, bandType Ba
 	}
 }
 
-func (band *Band) GetAllCombinationsOfSizeN(input []*Order, comboSize int) {
+func (band *Band) GetAllCombinationsOfSizeN(input []*Order, comboSize int, bandType BandType, refPrice float64) {
 	length := len(input)
 	output := make([]*Order, comboSize)
-	band.CombinationUtil(input, output, 0, length - 1, 0, comboSize)
+	band.CombinationUtil(input, output, 0, length - 1, 0, comboSize, bandType, refPrice)
 }
 
-func (band *Band) CombinationUtil(input []*Order, output []*Order, start int, end int, index int, comboSize int) {
+func (band *Band) CombinationUtil(input []*Order, output []*Order, start int, end int, index int, comboSize int, bandType BandType, refPrice float64) {
 	//Print Combo
 	if (index == comboSize) {
-		total := band.TotalAmount(output)
-		if (total >= band.MinAmount && total < band.MaxAmount) {
+		totalAmount := band.TotalAmount(output)
+		//if buy band convert denomination from base token to quote token by using average price of band
+		if t, ok := bandType.(BandType); ok {
+			if t.GetType() == "BUY" {
+				log.WithFields(logrus.Fields{"function": "CombinationUtil"}).Debug("Converting totalAmount denomination from quote token to base token due to Buy Band")
+				totalAmount = t.AvgPrice(refPrice) * totalAmount
+			}
+		}
+		if (totalAmount >= band.MinAmount && totalAmount < band.MaxAmount) {
 			temp := make([]*Order, comboSize)
 			copy(temp, output)
 			validCombos = append(validCombos, temp)
@@ -312,7 +344,7 @@ func (band *Band) CombinationUtil(input []*Order, output []*Order, start int, en
 	//Replace output[index] with all possible elements of input
     for i := start; i <= end && ((end - i + 1) >= (comboSize - index)); i++ {
     	output[index] = input[i]
-    	band.CombinationUtil(input, output, i + 1, end, index + 1, comboSize)
+    	band.CombinationUtil(input, output, i + 1, end, index + 1, comboSize, bandType, refPrice)
     }
 }
 
@@ -362,6 +394,10 @@ func (band *BuyBand) ExcessiveOrders(orders []*Order, refPrice float64) ([]*Orde
 	return band.Band.ExcessiveOrders(orders, refPrice, band)
 }
 
+func (band *BuyBand) GetType()	(string) {
+	return string("BUY")
+}
+
 ///////////////////////////////////
 //         SELL BAND
 ///////////////////////////////////
@@ -388,4 +424,8 @@ func (band *SellBand) ApplyMargin(price float64, margin float64) (float64) {
 
 func (band *SellBand) ExcessiveOrders(orders []*Order, refPrice float64) ([]*Order) {
 	return band.Band.ExcessiveOrders(orders, refPrice, band)
+}
+
+func (band *SellBand) GetType()	(string) {
+	return string("SELL")
 }
